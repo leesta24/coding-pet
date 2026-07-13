@@ -2,6 +2,8 @@
 
 CodingPet is a macOS floating companion for Codex CLI and Claude Code CLI sessions. It makes session state visible without keeping every terminal in front of you.
 
+For a zero-context development handoff, read `HANDOFF.md` and `AGENTS.md` first.
+
 The first milestone is intentionally small:
 
 - show an always-on-top floating bot;
