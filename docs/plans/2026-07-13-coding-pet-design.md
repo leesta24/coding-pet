@@ -1,8 +1,8 @@
-# AgentPet MVP design
+# CodingPet MVP design
 
 ## Product boundary
 
-AgentPet is a macOS-only floating companion for terminal sessions started by Codex CLI and Claude Code CLI. The bot summarizes work across sessions, calls attention when a session needs input, and opens a compact activity panel. Selecting a session returns the user to its terminal; approvals and replies remain inside the original CLI.
+CodingPet is a macOS-only floating companion for terminal sessions started by Codex CLI and Claude Code CLI. The bot summarizes work across sessions, calls attention when a session needs input, and opens a compact activity panel. Selecting a session returns the user to its terminal; approvals and replies remain inside the original CLI.
 
 The MVP does not execute prompts, approve tools, manage local servers, calculate billing, or host agent processes.
 
@@ -23,4 +23,3 @@ Hook installation must back up existing configuration, merge rather than overwri
 ## Verification
 
 Unit tests cover state priority and event normalization. Integration tests will use fixture hook payloads. UI verification will cover multi-display placement, Spaces, Reduce Motion, empty sessions, multiple waiting sessions, and terminal activation fallbacks.
-

@@ -42,7 +42,7 @@ extension Array where Element == AgentSession {
             AgentSession(
                 id: "codex-demo",
                 provider: .codex,
-                projectName: "agent-pet",
+                projectName: "coding-pet",
                 cwd: FileManager.default.currentDirectoryPath,
                 status: .needsInput,
                 summary: "Waiting for approval",
@@ -66,4 +66,3 @@ extension Array where Element == AgentSession {
         ]
     }
 }
-

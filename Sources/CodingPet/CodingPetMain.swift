@@ -1,7 +1,7 @@
 import AppKit
 
 @main
-enum AgentPetMain {
+enum CodingPetMain {
     @MainActor
     static func main() {
         let application = NSApplication.shared
@@ -32,4 +32,3 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         botWindowController?.show()
     }
 }
-

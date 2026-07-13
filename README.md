@@ -1,6 +1,6 @@
-# AgentPet
+# CodingPet
 
-AgentPet is a macOS floating companion for Codex CLI and Claude Code CLI sessions. It makes session state visible without keeping every terminal in front of you.
+CodingPet is a macOS floating companion for Codex CLI and Claude Code CLI sessions. It makes session state visible without keeping every terminal in front of you.
 
 The first milestone is intentionally small:
 
@@ -19,13 +19,13 @@ The first milestone is intentionally small:
 ## Run
 
 ```sh
-swift run AgentPet
+swift run CodingPet
 ```
 
 Launch with sample sessions while developing the UI:
 
 ```sh
-swift run AgentPet --demo
+swift run CodingPet --demo
 ```
 
 Run tests:
@@ -47,4 +47,3 @@ The current bot is an original vector placeholder. Production sprite sheets will
 ## Next milestone
 
 Add a local event bridge and non-blocking hooks for Codex and Claude Code, including reversible installation and config backups.
-

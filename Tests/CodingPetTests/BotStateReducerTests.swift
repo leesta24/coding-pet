@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AgentPet
+@testable import CodingPet
 
 struct BotStateReducerTests {
     @Test
@@ -43,4 +43,3 @@ struct BotStateReducerTests {
         )
     }
 }
-

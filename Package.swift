@@ -3,23 +3,22 @@
 import PackageDescription
 
 let package = Package(
-    name: "AgentPet",
+    name: "CodingPet",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "AgentPet", targets: ["AgentPet"])
+        .executable(name: "CodingPet", targets: ["CodingPet"])
     ],
     targets: [
         .executableTarget(
-            name: "AgentPet",
-            path: "Sources/AgentPet"
+            name: "CodingPet",
+            path: "Sources/CodingPet"
         ),
         .testTarget(
-            name: "AgentPetTests",
-            dependencies: ["AgentPet"],
-            path: "Tests/AgentPetTests"
+            name: "CodingPetTests",
+            dependencies: ["CodingPet"],
+            path: "Tests/CodingPetTests"
         )
     ]
 )
-
