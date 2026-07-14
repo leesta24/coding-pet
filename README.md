@@ -1,106 +1,141 @@
 # CodingPet
 
-CodingPet is a macOS floating companion for Codex CLI and Claude Code CLI sessions. It makes session state visible without keeping every terminal in front of you.
+[![CI](https://github.com/leesta24/coding-pet/actions/workflows/ci.yml/badge.svg)](https://github.com/leesta24/coding-pet/actions/workflows/ci.yml)
+![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black)
+![Apple silicon](https://img.shields.io/badge/Apple%20silicon-arm64-black)
+[![MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
 
-For a zero-context development handoff, read `HANDOFF.md` and `AGENTS.md` first.
+CodingPet is a native macOS floating companion for Codex and Claude Code. It
+keeps active agent sessions visible, tells you when a task needs attention, and
+returns you to the right session without taking keyboard focus away from your
+editor or terminal.
 
-The first milestone is intentionally small:
+## What it does
 
-- show an always-on-top floating bot;
-- let the bot be repositioned without treating a drag release as a click;
-- aggregate active CLI sessions;
-- call attention when a session needs user input;
-- show sessions in a compact panel;
-- return the user to the originating terminal.
+- **Watch multiple sessions** — show running tasks, explicit input requests,
+  and completed Codex tasks with unread activity.
+- **Stay out of the way** — a transparent always-on-top pet and compact bubbles
+  remain visible across Spaces without becoming the key window.
+- **Jump back to work** — open an exact Codex App task when its thread ID is
+  available, with terminal and working-directory fallbacks for CLI sessions.
+- **Show useful progress** — display the latest structured Codex activity
+  message while a task is running, without parsing transcript files.
+- **Customize the companion** — choose a pet, resize it, control animations,
+  and independently enable Running, Pending input, and Ready bubbles.
+- **Keep everything local** — no account, cloud service, analytics, telemetry,
+  prompt upload, code upload, or remote session storage.
 
-The official build includes the user-owned, Codex-compatible v2 胖墩 pet.
-CodingPet also discovers private v2 pet packages from
-`~/Library/Application Support/CodingPet/Pets/`; local packages never enter the
-repository or release artifacts. Open the session panel and choose the gear
-button to switch between available pets in the dedicated Appearance settings
-page. Each pet has a large image card in the pet library; the selection is
-stored locally and restored on the next launch. The
-same page includes a 64–160pt Bot size slider that updates the floating pet
-immediately and persists the chosen size.
+## Codex and Claude Code support
 
-Settings also reports Codex CLI and Claude Code hook installation status,
-provides independent reversible install/repair/uninstall actions for each provider, controls status animation, and
-has independent Running, Pending input, and Ready bubble switches. Turning
-Pending input or Ready bubbles off folds that state into a compact attention
-count; turning Running bubbles off hides those notifications completely. Click a full bubble to open its exact
-session, or close that bubble without stopping/removing the session. A closed
-Running bubble stays quiet across later messages and tool activity, then
-reappears if the session needs input or gains an unread Ready marker. The close
-control appears only while hovering that card. Three or more eligible bubbles stay in a two-row vertical scroll
-viewport without a persistent scrollbar instead of being discarded. Click a
-compact count to choose from the
-session panel. The interactive bubble window shrinks to its visible content and
-remains non-activating, so it does not cover the nearby editor with a large
-transparent click target.
-Settings also documents CodingPet's local-only privacy boundary.
+| Capability | Codex | Claude Code |
+| --- | --- | --- |
+| Non-blocking lifecycle hooks | Yes | Yes |
+| Running and pending-input state | Yes | Yes |
+| Reversible per-provider hook install | Yes | Yes |
+| Completed unread task state | Codex App local state | Not currently exposed |
+| Latest agent activity message | Codex local app-server | Not currently exposed |
+| Navigation | Exact Codex App task, then fallbacks | Originating terminal/workspace fallback |
+| Usage window summary | Codex local app-server | Not currently exposed |
 
-The panel lists sessions that are actively working, explicitly waiting for
-input, or marked unread by Codex App. Opening a CLI alone does not create a row,
-and a completed/stopped turn loses its running state immediately. It appears as
-Ready only while its ID is in Codex App's local unread index; ordinary read or
-idle tasks remain hidden. A later prompt recreates its running row. The native
-single-surface panel adapts its height to one through four sessions, then
-scrolls without reserving blank space for missing rows. While the panel is open,
-the conversation-bubble overlay is hidden and returns when the panel closes.
-When the Codex hook is installed, the header also reads the local Codex
-app-server and shows a quiet, text-only summary of the current rate-limit
-windows. If the hook is missing, damaged, or the local request fails, the
-usage summary is omitted without reserving space.
+CodingPet observes and navigates. Permission approvals and user replies always
+remain inside Codex or Claude Code.
+
+## Pet library
+
+The official source tree includes the user-owned **胖墩** appearance.
+CodingPet also discovers private Codex-compatible v2 packages from:
+
+```text
+~/Library/Application Support/CodingPet/Pets/<pet-id>/
+├── pet.json
+└── spritesheet.webp
+```
+
+A valid package uses a transparent `1536x2288` atlas: 8 columns, 11 rows, and
+`192x208` cells. Private packages stay outside this repository and are never
+copied into application or DMG builds.
+
+### Create a new pet with Codex
+
+The repository includes an installable Codex skill that guides creation of an
+original or user-owned v2 appearance and installs it into the local pet
+library:
+
+```sh
+mkdir -p ~/.codex/skills
+cp -R skills/create-coding-pet-appearance ~/.codex/skills/
+```
+
+Then ask Codex:
+
+```text
+$create-coding-pet-appearance Create a new CodingPet from character art I own.
+```
+
+### Migrate a custom pet from Codex
+
+Only customized pets that you created, commissioned, or otherwise have the
+right to reuse may be migrated. Built-in Codex pets and application assets are
+explicitly excluded.
+
+```sh
+mkdir -p ~/.codex/skills
+cp -R skills/migrate-codex-custom-pet ~/.codex/skills/
+```
+
+Then provide the exact custom pet ID or directory:
+
+```text
+$migrate-codex-custom-pet Migrate my user-created pet from ~/.codex/pets/my-pet.
+```
+
+Restart CodingPet after adding or removing a local package so the Appearance
+gallery refreshes.
 
 ## Requirements
 
 - macOS 14 or later
 - Apple silicon
 - Xcode 26 or a compatible Swift 6.2 toolchain
+- Codex CLI and/or Claude Code CLI
 
-## Run
+## Build and run
+
+Run directly with SwiftPM:
 
 ```sh
 swift run CodingPet
 ```
 
-Launch with sample sessions while developing the UI:
+Launch with sample sessions while developing the interface:
 
 ```sh
 swift run CodingPet --demo
 ```
 
-Run tests:
-
-```sh
-swift test
-```
-
-Build a conventional Apple-silicon application bundle:
+Build a conventional local application bundle:
 
 ```sh
 scripts/build-app.sh
 open dist/CodingPet.app
 ```
 
-Release maintainers can create a Developer ID signed DMG locally and submit it
-for notarization with `scripts/release-dmg.sh`. Credential setup and artifact
-verification are documented in [Packaging/README.md](Packaging/README.md).
+Public DMG releases are intentionally deferred while the current interaction
+and session-lifecycle fixes are completed.
 
-Build the best-effort lifecycle hook helper:
+## Connect providers
 
-```sh
-swift build --product CodingPetHook
-```
+Open the pet, choose **Settings → Integrations**, then install Codex CLI and
+Claude Code independently. CodingPet:
 
-`CodingPetHook` accepts `--provider codex` or `--provider claude-code`, reads
-one provider hook JSON object from stdin, strips it down to routing metadata,
-and attempts to deliver it to the running app. It is intentionally silent and
-returns success when the app or socket is unavailable. Do not point provider
-configuration at `swift run`, because SwiftPM build output and startup work do
-not belong in a CLI lifecycle hook.
+- merges its handlers instead of replacing existing configuration;
+- creates permission-restricted backups;
+- activates its own Codex hook hashes through the local Codex app-server;
+- removes only CodingPet-owned handlers during uninstall;
+- exits hooks quickly and successfully when the app or local socket is absent;
+- never approves, denies, or modifies a tool request.
 
-For a SwiftPM development build, install or uninstall the lifecycle hooks with:
+Development builds can also manage both providers from the command line:
 
 ```sh
 swift build
@@ -108,78 +143,46 @@ swift build
 .build/debug/CodingPet --uninstall-hooks
 ```
 
-Installation merges CodingPet matcher groups into `~/.codex/hooks.json` and
-`~/.claude/settings.json`, creates `0600` sidecar backups, and is idempotent.
-It then uses the local `codex app-server` `hooks/list` response to read each
-installed CodingPet hook's exact current hash and records those hashes through
-`config/batchWrite`, so the hooks are active without a separate `/hooks` step.
-The installer also removes AgentPeek bridge hooks and their Codex trust entries
-without touching unrelated hooks; CodingPet's backups are sanitized so an
-uninstall cannot restore AgentPeek later. Set `CODEX_CLI_PATH` if `codex` is not
-in a standard installation location or the app's `PATH`.
+## Development
 
-Uninstall restores the original bytes when no unrelated edits occurred; when
-the user changed other settings after installation, it removes only handlers
-owned by CodingPet. It also removes CodingPet's saved Codex trust entries.
+Run the complete test suite:
 
-You can open `Package.swift` directly in Xcode.
+```sh
+swift test
+```
 
-## Current structure
+The current suite covers provider payload normalization, hook privacy,
+configuration merging and restoration, session lifecycle reconciliation,
+Codex navigation, local pet discovery, floating-window behavior, and SwiftUI
+rendering.
 
-- `Models`: normalized agent session and bot state
-- `CodingPetBridge`: safe hook envelope, sanitizer, codec, and bounded socket client
-- `CodingPetHook`: silent stdin-to-socket helper executable
-- `Services`: session store, provider adapters, socket listener, and terminal navigation boundary
-- `UI`: transparent floating bot panel and session panel
+Main source areas:
 
-胖墩 and validated private pet packages share the production
-Codex-compatible v2 WebP atlas path. Their idle, running, waiting, review, and
-failed rows map directly to CodingPet states. Idle poses stay still for several
-seconds and only play an occasional brief gesture.
+- `Sources/CodingPet`: native AppKit/SwiftUI application
+- `Sources/CodingPetBridge`: bounded, metadata-only local hook protocol
+- `Sources/CodingPetHook`: best-effort CLI lifecycle helper
+- `Sources/CodingPet/Resources/Pets`: officially bundled appearances
+- `skills`: optional Codex workflows for creating and migrating private pets
+- `Tests`: unit, integration, rendering, and packaging smoke tests
+
+## Privacy
+
+Hook events contain only provider, event name, safe event subtype, timestamp,
+parent PID, session ID, and working directory. Prompt text, assistant replies,
+tool input, tool output, code, diffs, and transcript paths are removed before
+delivery. The Unix socket is per-user, permission restricted, local only, and
+message-size bounded.
+
+Codex-specific task names, unread IDs, activity messages, and usage windows are
+read from local Codex interfaces and remain on the Mac. CodingPet does not
+parse Codex or Claude transcript files.
 
 ## License
 
-CodingPet source code is available under the [MIT License](LICENSE). The
-bundled 胖墩 artwork is not covered by MIT; see
+The source code is available under the [MIT License](LICENSE). The bundled
+胖墩 character artwork is not covered by MIT; see
 [ASSET_LICENSE.md](ASSET_LICENSE.md) before redistributing a fork or build.
 
 CodingPet is an independent project and is not affiliated with, endorsed by,
 or sponsored by OpenAI or Anthropic. Codex and Claude are trademarks of their
 respective owners.
-
-## Next milestone
-
-Publish the first signed and notarized GitHub Release, validate lifecycle
-delivery against a real Claude Code session, and improve terminal-process
-ancestry resolution. The standard `.app` now packages its helper under
-`Contents/Helpers`, and CI/tag workflows cover tests, Developer ID signing,
-notarization, DMG verification, and release upload. A real Codex CLI `0.142.5`
-smoke run completed both the `SessionStart` and `UserPromptSubmit` hooks.
-
-## Event bridge privacy
-
-The bridge sends only a protocol version, provider, event name, safe event
-subtype, timestamp, parent PID, session ID, and working directory. Prompt text,
-assistant responses, transcript paths, tool input, tool output, code, and diffs
-are discarded before socket delivery. The per-user Unix socket is created in
-the macOS temporary directory with mode `0600` and accepts messages up to 16 KiB.
-For Codex sessions, the app separately resolves the optional user-facing
-`thread.name` from the local `codex app-server` using the session ID. It does
-not request turns or use the thread preview; missing names fall back to the
-project directory name. On startup and every 15 seconds, CodingPet also asks
-the app-server for non-archived thread IDs and removes archived or deleted
-Codex sessions from its local metadata snapshots. If the app-server is
-unavailable or returns malformed data, existing sessions are retained.
-
-For running Codex sessions, `PreToolUse` and `PostToolUse` also trigger a local
-app-server `thread/read` call. CodingPet extracts only the current turn's latest
-structured `agentMessage`, truncates it for the two-line activity bubble, and
-keeps it in memory only. It is never added to the hook envelope or snapshot
-store. CodingPet does not parse Codex or Claude transcript files; Claude Code
-continues to show lifecycle summaries until it exposes an equivalent local API.
-
-For Codex Ready state, CodingPet reads only the typed local unread-thread ID
-field from `~/.codex/.codex-global-state.json`, then resolves matching name,
-working directory, and update time through `thread/read(includeTurns:false)`.
-The file is size-bounded and malformed or missing state fails closed. CodingPet
-does not write Codex App state.

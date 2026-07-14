@@ -5,3 +5,9 @@ DerivedData/
 xcuserdata/
 work/
 dist/
+
+# Local agent handoff and implementation notes
+AGENTS.md
+HANDOFF.md
+docs/adr/
+docs/plans/
