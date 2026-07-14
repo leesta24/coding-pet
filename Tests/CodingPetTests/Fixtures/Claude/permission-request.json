@@ -1,0 +1,12 @@
+{
+  "session_id": "claude-session-1",
+  "transcript_path": "/private/secret/claude-transcript.jsonl",
+  "cwd": "/Users/example/Projects/coding-pet",
+  "permission_mode": "default",
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "rm -rf private-build-output",
+    "description": "Sensitive tool request"
+  }
+}

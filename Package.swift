@@ -8,17 +8,30 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "CodingPet", targets: ["CodingPet"])
+        .executable(name: "CodingPet", targets: ["CodingPet"]),
+        .executable(name: "CodingPetHook", targets: ["CodingPetHook"])
     ],
     targets: [
+        .target(
+            name: "CodingPetBridge",
+            path: "Sources/CodingPetBridge"
+        ),
         .executableTarget(
             name: "CodingPet",
-            path: "Sources/CodingPet"
+            dependencies: ["CodingPetBridge"],
+            path: "Sources/CodingPet",
+            resources: [.copy("Resources/Pets")]
+        ),
+        .executableTarget(
+            name: "CodingPetHook",
+            dependencies: ["CodingPetBridge"],
+            path: "Sources/CodingPetHook"
         ),
         .testTarget(
             name: "CodingPetTests",
-            dependencies: ["CodingPet"],
-            path: "Tests/CodingPetTests"
+            dependencies: ["CodingPet", "CodingPetBridge"],
+            path: "Tests/CodingPetTests",
+            resources: [.copy("Fixtures")]
         )
     ]
 )

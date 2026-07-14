@@ -17,6 +17,10 @@ enum SessionStatus: String, Codable, CaseIterable, Sendable {
     case needsInput
     case ready
     case blocked
+
+    var isActive: Bool {
+        self == .running || self == .needsInput || self == .ready
+    }
 }
 
 struct TerminalTarget: Codable, Hashable, Sendable {
@@ -29,11 +33,21 @@ struct AgentSession: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let provider: AgentProvider
     let projectName: String
+    var sessionName: String? = nil
     let cwd: String
     var status: SessionStatus
     var summary: String
     var updatedAt: Date
     var terminal: TerminalTarget?
+
+    var displayName: String {
+        sessionName ?? projectName
+    }
+
+    var providerSessionID: String {
+        guard let separator = id.firstIndex(of: ":") else { return id }
+        return String(id[id.index(after: separator)...])
+    }
 }
 
 extension Array where Element == AgentSession {
