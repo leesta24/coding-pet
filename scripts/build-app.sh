@@ -48,6 +48,7 @@ install -m 755 "$main_executable" "$contents/MacOS/CodingPet"
 install -m 755 "$hook_executable" "$contents/Helpers/CodingPetHook"
 /usr/bin/ditto "$resource_bundle" "$contents/Resources/CodingPet_CodingPet.bundle"
 install -m 644 "$repo_root/Packaging/Info.plist" "$contents/Info.plist"
+install -m 644 "$repo_root/Packaging/AppIcon.icns" "$contents/Resources/AppIcon.icns"
 install -m 644 "$repo_root/LICENSE" "$contents/Resources/Licenses/LICENSE"
 install -m 644 "$repo_root/ASSET_LICENSE.md" "$contents/Resources/Licenses/ASSET_LICENSE.md"
 

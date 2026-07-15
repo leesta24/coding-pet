@@ -5,10 +5,12 @@ apply to the character artwork below:
 
 ```text
 Sources/CodingPet/Resources/Pets/xiaobao/**
+Packaging/AppIcon.png
+Packaging/AppIcon.icns
 ```
 
-The 胖墩 character and artwork are copyright (c) 2026 Juyi Wu. All rights
-reserved.
+The 胖墩 character, character artwork, and CodingPet application icon are
+copyright (c) 2026 Juyi Wu. All rights reserved.
 
 You may download and use these files as part of an unmodified official
 CodingPet release, or build CodingPet from source with them for personal use.

@@ -15,16 +15,20 @@ app="$temporary_directory/CodingPet.app"
 main_executable="$app/Contents/MacOS/CodingPet"
 hook_executable="$app/Contents/Helpers/CodingPetHook"
 resource_bundle="$app/Contents/Resources/CodingPet_CodingPet.bundle"
+app_icon="$app/Contents/Resources/AppIcon.icns"
 
 test -f "$app/Contents/Info.plist"
 test -x "$main_executable"
 test -x "$hook_executable"
 test -d "$resource_bundle"
+test -f "$app_icon"
 test -f "$resource_bundle/Pets/xiaobao/pet.json"
 test -f "$resource_bundle/Pets/xiaobao/spritesheet.webp"
 
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = \
     "com.juyiwu.codingpet"
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app/Contents/Info.plist")" = \
+    "AppIcon"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = \
     "0.1.0"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = \
