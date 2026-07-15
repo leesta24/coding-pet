@@ -3,6 +3,8 @@ import AppKit
 @MainActor
 enum SessionNavigator {
     static func activate(_ session: AgentSession) {
+        guard supportsDirectActivation(session) else { return }
+
         if let threadURL = codexThreadURL(for: session),
            NSWorkspace.shared.open(threadURL) {
             return
@@ -23,6 +25,10 @@ enum SessionNavigator {
         }
 
         NSWorkspace.shared.open(URL(fileURLWithPath: session.cwd))
+    }
+
+    static func supportsDirectActivation(_ session: AgentSession) -> Bool {
+        session.provider == .codex
     }
 
     static func codexThreadURL(for session: AgentSession) -> URL? {

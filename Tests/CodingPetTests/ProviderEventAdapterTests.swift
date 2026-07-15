@@ -30,7 +30,6 @@ struct ProviderEventAdapterTests {
         ("Codex/session-start.json", HookProvider.codex),
         ("Codex/stop.json", HookProvider.codex),
         ("Claude/session-start.json", HookProvider.claudeCode),
-        ("Claude/stop.json", HookProvider.claudeCode),
         ("Claude/stop-failure.json", HookProvider.claudeCode),
     ])
     func inactiveLifecycleFixturesDoNotCreateVisibleSessions(
@@ -40,6 +39,18 @@ struct ProviderEventAdapterTests {
         let event = try fixtureEvent(path, provider: provider)
 
         #expect(SessionEventRouter.session(for: event, existing: nil) == nil)
+    }
+
+    @Test
+    func claudeStopCreatesAReadySessionUntilItIsAcknowledged() throws {
+        let event = try fixtureEvent("Claude/stop.json", provider: .claudeCode)
+
+        let session = SessionEventRouter.session(for: event, existing: nil)
+
+        #expect(event.clearsActiveSession == false)
+        #expect(session?.provider == .claudeCode)
+        #expect(session?.status == .ready)
+        #expect(session?.summary == "Completed — ready to review")
     }
 
     @Test
@@ -273,6 +284,33 @@ struct ProviderEventAdapterTests {
     }
 
     @Test
+    func unnamedClaudeSessionDoesNotExposeItsDerivedProjectDirectoryAsATitle() {
+        let claude = AgentSession(
+            id: "claude-code:unnamed",
+            provider: .claudeCode,
+            projectName: "today-cloud",
+            cwd: "/tmp/today-cloud",
+            status: .running,
+            summary: "Working",
+            updatedAt: .now,
+            terminal: nil
+        )
+        let codex = AgentSession(
+            id: "codex:unnamed",
+            provider: .codex,
+            projectName: "today-cloud",
+            cwd: "/tmp/today-cloud",
+            status: .running,
+            summary: "Working",
+            updatedAt: .now,
+            terminal: nil
+        )
+
+        #expect(claude.displayName == "Untitled session")
+        #expect(codex.displayName == "today-cloud")
+    }
+
+    @Test
     @MainActor
     func latestMessageUpdatesOnlyTheMatchingRunningLifecycleEvent() {
         let timestamp = Date.now
@@ -359,6 +397,36 @@ struct ProviderEventAdapterTests {
             sessionID: "ending",
             cwd: "/tmp/project"
         ))
+        #expect(store.sessions.isEmpty)
+    }
+
+    @Test
+    @MainActor
+    func claudeStopBecomesReadyNewPromptRunsAndSessionEndRemovesIt() {
+        let store = SessionStore()
+        let now = Date.now
+        let event: (String, TimeInterval) -> HookEventEnvelope = { name, offset in
+            HookEventEnvelope(
+                provider: .claudeCode,
+                eventName: name,
+                timestamp: now.addingTimeInterval(offset),
+                parentProcessID: nil,
+                sessionID: "claude-ready",
+                cwd: "/tmp/project"
+            )
+        }
+
+        store.apply(event("UserPromptSubmit", 0))
+        #expect(store.sessions.first?.status == .running)
+
+        store.apply(event("Stop", 1))
+        #expect(store.sessions.first?.status == .ready)
+        #expect(store.attentionCount == 1)
+
+        store.apply(event("UserPromptSubmit", 2))
+        #expect(store.sessions.first?.status == .running)
+
+        store.apply(event("SessionEnd", 3))
         #expect(store.sessions.isEmpty)
     }
 

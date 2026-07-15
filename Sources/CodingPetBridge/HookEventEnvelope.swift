@@ -37,12 +37,14 @@ public struct HookEventEnvelope: Codable, Equatable, Sendable {
         self.cwd = cwd
     }
 
-    /// Lifecycle boundaries that mean the provider is no longer actively
-    /// working or explicitly waiting for user input.
+    /// Lifecycle boundaries that remove the provider session from CodingPet.
+    /// Claude Stop is retained as a one-time Ready notification instead.
     public var clearsActiveSession: Bool {
         switch eventName {
-        case "SessionStart", "Stop", "SessionEnd", "StopFailure":
+        case "SessionStart", "SessionEnd", "StopFailure":
             true
+        case "Stop":
+            provider == .codex
         default:
             false
         }

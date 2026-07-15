@@ -22,6 +22,16 @@ struct SessionNavigatorTests {
         )
 
         #expect(SessionNavigator.codexThreadURL(for: session) == nil)
+        #expect(!SessionNavigator.supportsDirectActivation(session))
+    }
+
+    @Test
+    func onlyCodexSessionsSupportDirectActivation() {
+        let codex = makeSession(id: "codex:not-a-thread-id", provider: .codex)
+        let claude = makeSession(id: "claude-code:session", provider: .claudeCode)
+
+        #expect(SessionNavigator.supportsDirectActivation(codex))
+        #expect(!SessionNavigator.supportsDirectActivation(claude))
     }
 
     @Test

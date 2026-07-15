@@ -61,9 +61,42 @@ struct HookEventSnapshotStoreTests {
         #expect(store.snapshots() == [active])
     }
 
-    private func event(name: String, timestamp: Date) -> HookEventEnvelope {
+    @Test
+    func claudeStopPersistsReadySnapshotUntilSessionEnd() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "codingpet-snapshots-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = HookEventSnapshotStore(directoryURL: directory)
+        let active = event(
+            provider: .claudeCode,
+            name: "UserPromptSubmit",
+            timestamp: Date(timeIntervalSince1970: 1)
+        )
+        let stopped = event(
+            provider: .claudeCode,
+            name: "Stop",
+            timestamp: Date(timeIntervalSince1970: 2)
+        )
+        let ended = event(
+            provider: .claudeCode,
+            name: "SessionEnd",
+            timestamp: Date(timeIntervalSince1970: 3)
+        )
+
+        #expect(store.persist(active))
+        #expect(store.persist(stopped))
+        #expect(store.snapshots() == [stopped])
+        #expect(store.persist(ended))
+        #expect(store.snapshots().isEmpty)
+    }
+
+    private func event(
+        provider: HookProvider = .codex,
+        name: String,
+        timestamp: Date
+    ) -> HookEventEnvelope {
         HookEventEnvelope(
-            provider: .codex,
+            provider: provider,
             eventName: name,
             timestamp: timestamp,
             parentProcessID: 123,

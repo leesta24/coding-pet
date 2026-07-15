@@ -5,6 +5,10 @@ import SwiftUI
 @MainActor
 final class SessionPanelController {
     private let panel: NSPanel
+    private let store: SessionStore
+    private let onAcknowledge: @MainActor (AgentSession) -> Void
+    private let navigateToSession: @MainActor (AgentSession) -> Void
+    private let onNavigationUnavailable: @MainActor (AgentSession, NSRect) -> Void
     var onVisibilityChange: (@MainActor (Bool) -> Void)?
     // AppKit owns these opaque monitor tokens. Access is confined to the main
     // thread except for deinit, where they must still be removed.
@@ -18,12 +22,20 @@ final class SessionPanelController {
         store: SessionStore,
         codexUsageStore: CodexUsageStore? = nil,
         onAcknowledge: @escaping @MainActor (AgentSession) -> Void = { _ in },
+        navigateToSession: @escaping @MainActor (AgentSession) -> Void = {
+            SessionNavigator.activate($0)
+        },
+        onNavigationUnavailable: @escaping @MainActor (AgentSession, NSRect) -> Void = { _, _ in },
         onOpenSettings: @escaping @MainActor () -> Void = {}
     ) {
         let usageStore = codexUsageStore ?? CodexUsageStore(
             statusProvider: { .notInstalled }
         )
         self.codexUsageStore = usageStore
+        self.store = store
+        self.onAcknowledge = onAcknowledge
+        self.navigateToSession = navigateToSession
+        self.onNavigationUnavailable = onNavigationUnavailable
         let initialSize = SessionPanelLayout.size(
             sessionCount: store.activeSessions.count
         )
@@ -48,12 +60,8 @@ final class SessionPanelController {
         let hostingView = NSHostingView(
             rootView: SessionPanelRootView(
                 usageStore: usageStore,
-                onSelect: { session in
-                    SessionNavigator.activate(session)
-                    if store.acknowledge(session) {
-                        onAcknowledge(session)
-                    }
-                    self.hide()
+                onSelect: { [weak self] session in
+                    self?.handleSessionActivation(session)
                 },
                 onOpenSettings: {
                     self.hide()
@@ -144,6 +152,18 @@ final class SessionPanelController {
         panel.orderOut(nil)
         removeEventMonitors()
         onVisibilityChange?(false)
+    }
+
+    func handleSessionActivation(_ session: AgentSession) {
+        if SessionNavigator.supportsDirectActivation(session) {
+            navigateToSession(session)
+        } else {
+            onNavigationUnavailable(session, panel.frame)
+        }
+        if store.acknowledge(session) {
+            onAcknowledge(session)
+        }
+        hide()
     }
 
     private func installEventMonitors(relativeTo botPanel: NSPanel) {

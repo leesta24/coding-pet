@@ -229,7 +229,11 @@ private struct DismissibleSessionBubble: View {
                 )
             }
             .buttonStyle(BubbleButtonStyle())
-            .help("Open \(session.displayName)")
+            .help(
+                session.provider == .claudeCode
+                    ? "Claude Code sessions cannot be opened directly"
+                    : "Open \(session.displayName)"
+            )
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
@@ -298,10 +302,14 @@ private struct SessionConversationBubble: View {
                 .frame(width: 3, height: 26)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(session.displayName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(session.displayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    ProviderBadge(provider: session.provider)
+                }
 
                 Text(session.summary.isEmpty ? fallbackSummary : session.summary)
                     .font(.system(size: 11, weight: .regular))
@@ -326,7 +334,7 @@ private struct SessionConversationBubble: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(session.displayName), " +
+            "\(session.displayName), \(session.provider.displayName), " +
             "\(session.summary.isEmpty ? fallbackSummary : session.summary)"
         )
     }
@@ -356,10 +364,18 @@ private struct SessionConversationBubble: View {
     private var bubbleBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
                 .fill(
                     colorScheme == .dark
-                        ? Color(red: 0.06, green: 0.065, blue: 0.08).opacity(0.90)
-                        : Color.white.opacity(isHovered ? 0.94 : 0.89)
+                        ? Color(red: 0.06, green: 0.065, blue: 0.08).opacity(0.64)
+                        : Color.white.opacity(isHovered ? 0.48 : 0.36)
+                )
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(
+                    session.provider.visualTint.opacity(
+                        colorScheme == .dark ? 0.070 : 0.048
+                    )
                 )
             LinearGradient(
                 colors: [accent.opacity(isHovered ? 0.055 : 0.032), .clear],

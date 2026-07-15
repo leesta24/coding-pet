@@ -13,7 +13,8 @@ editor or terminal.
 ## What it does
 
 - **Watch multiple sessions** — show running tasks, explicit input requests,
-  and completed Codex tasks with unread activity.
+  completed Codex tasks with unread activity, and completed Claude turns until
+  you acknowledge them.
 - **Stay out of the way** — a transparent always-on-top pet and compact bubbles
   remain visible across Spaces without becoming the key window.
 - **Jump back to work** — open an exact Codex App task when its thread ID is
@@ -31,10 +32,11 @@ editor or terminal.
 | --- | --- | --- |
 | Non-blocking lifecycle hooks | Yes | Yes |
 | Running and pending-input state | Yes | Yes |
+| Session display name | Codex local app-server | Claude local activity metadata |
 | Reversible per-provider hook install | Yes | Yes |
-| Completed unread task state | Codex App local state | Not currently exposed |
+| Completed attention state | Codex App unread state | Stop hook + Claude Desktop unread state |
 | Latest agent activity message | Codex local app-server | Not currently exposed |
-| Navigation | Exact Codex App task, then fallbacks | Originating terminal/workspace fallback |
+| Navigation | Exact Codex App task, then fallbacks | Direct navigation unavailable; shows a local notice |
 | Usage window summary | Codex local app-server | Not currently exposed |
 
 CodingPet observes and navigates. Permission approvals and user replies always
@@ -174,8 +176,14 @@ delivery. The Unix socket is per-user, permission restricted, local only, and
 message-size bounded.
 
 Codex-specific task names, unread IDs, activity messages, and usage windows are
-read from local Codex interfaces and remain on the Mac. CodingPet does not
-parse Codex or Claude transcript files.
+read from local Codex interfaces and remain on the Mac. Claude Desktop titles
+are matched exactly from `cliSessionId` to the bounded metadata index in
+`~/Library/Application Support/Claude/claude-code-sessions`. Claude read state
+also uses only bounded session metadata plus focused-session events extracted
+from the tail of Claude Desktop's local `main.log`; prompts and responses are
+never inspected. CodingPet then falls back to explicit Claude Code `--name` or
+`/rename` values, ignores directory-derived process names, and otherwise uses
+`Untitled session`. CodingPet does not parse Codex or Claude transcript files.
 
 ## License
 

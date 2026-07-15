@@ -9,15 +9,16 @@ struct SessionSnapshotReconcilerTests {
         let activeCodex = event(provider: .codex, name: "UserPromptSubmit", sessionID: "active")
         let archivedCodex = event(provider: .codex, name: "PostToolUse", sessionID: "archived")
         let claude = event(provider: .claudeCode, name: "PermissionRequest", sessionID: "claude")
+        let claudeStopped = event(provider: .claudeCode, name: "Stop", sessionID: "claude-ready")
         let stopped = event(provider: .codex, name: "Stop", sessionID: "stopped")
         let started = event(provider: .claudeCode, name: "SessionStart", sessionID: "started")
 
         let result = SessionSnapshotReconciler.reconcile(
-            [activeCodex, archivedCodex, claude, stopped, started],
+            [activeCodex, archivedCodex, claude, claudeStopped, stopped, started],
             activeCodexThreadIDs: ["active"]
         )
 
-        #expect(result.restorableEvents == [activeCodex, claude])
+        #expect(result.restorableEvents == [activeCodex, claude, claudeStopped])
         #expect(result.staleRoutes == [
             HookSessionRoute(provider: .codex, sessionID: "archived"),
             HookSessionRoute(provider: .codex, sessionID: "stopped"),
@@ -26,7 +27,7 @@ struct SessionSnapshotReconcilerTests {
     }
 
     @Test
-    func unavailableCatalogPreservesActiveCodexSnapshotsButStillDropsInactiveEvents() {
+    func unavailableCatalogPreservesActiveCodexAndClaudeReadySnapshots() {
         let codex = event(provider: .codex, name: "PreToolUse", sessionID: "unknown")
         let stopped = event(provider: .claudeCode, name: "Stop", sessionID: "stopped")
 
@@ -35,10 +36,8 @@ struct SessionSnapshotReconcilerTests {
             activeCodexThreadIDs: nil
         )
 
-        #expect(result.restorableEvents == [codex])
-        #expect(result.staleRoutes == [
-            HookSessionRoute(provider: .claudeCode, sessionID: "stopped")
-        ])
+        #expect(result.restorableEvents == [codex, stopped])
+        #expect(result.staleRoutes.isEmpty)
     }
 
     private func event(

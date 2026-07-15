@@ -16,6 +16,7 @@ final class BotWindowController {
     private let panel: NSPanel
     private let bubblePanel: NSPanel
     private let sessionPanel: SessionPanelController
+    private let navigationNoticeController: SessionNavigationNoticeController
     private let settingsWindow: SettingsWindowController
     private let store: SessionStore
     private let onAcknowledge: @MainActor (AgentSession) -> Void
@@ -74,10 +75,16 @@ final class BotWindowController {
             integrationStore: integrationStore
         )
         self.settingsWindow = settingsWindow
+        let navigationNoticeController = SessionNavigationNoticeController()
+        self.navigationNoticeController = navigationNoticeController
         sessionPanel = SessionPanelController(
             store: store,
             codexUsageStore: codexUsageStore,
             onAcknowledge: onAcknowledge,
+            navigateToSession: navigateToSession,
+            onNavigationUnavailable: { _, anchorFrame in
+                navigationNoticeController.show(beside: anchorFrame)
+            },
             onOpenSettings: { [weak settingsWindow] in
                 settingsWindow?.show()
             }
@@ -157,6 +164,10 @@ final class BotWindowController {
 
     var isSessionPanelVisible: Bool {
         sessionPanel.isVisible
+    }
+
+    var isNavigationNoticeVisible: Bool {
+        navigationNoticeController.isVisible
     }
 
     var floatingPanelsPreserveKeyboardFocus: Bool {
@@ -417,7 +428,11 @@ final class BotWindowController {
     }
 
     func handleBubbleActivation(_ session: AgentSession) {
-        navigateToSession(session)
+        if SessionNavigator.supportsDirectActivation(session) {
+            navigateToSession(session)
+        } else {
+            navigationNoticeController.show(beside: bubblePanel.frame)
+        }
         if store.acknowledge(session) {
             onAcknowledge(session)
         }

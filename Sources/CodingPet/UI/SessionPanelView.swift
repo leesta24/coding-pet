@@ -95,6 +95,11 @@ struct SessionPanelView: View {
                         SessionRow(session: session)
                     }
                     .buttonStyle(.plain)
+                    .help(
+                        session.provider == .claudeCode
+                            ? "Claude Code sessions cannot be opened directly"
+                            : "Open \(session.displayName)"
+                    )
 
                     if index < sortedSessions.count - 1 {
                         Divider()
@@ -233,6 +238,8 @@ private struct PanelIconButtonStyle: ButtonStyle {
 }
 
 private struct SessionRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let session: AgentSession
     @State private var isHovered = false
 
@@ -247,10 +254,7 @@ private struct SessionRow: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    Text(session.provider.shortDisplayName.uppercased())
-                        .font(.system(size: 8, weight: .semibold))
-                        .tracking(0.35)
-                        .foregroundStyle(.tertiary)
+                    ProviderBadge(provider: session.provider)
                 }
 
                 HStack(spacing: 5) {
@@ -270,7 +274,11 @@ private struct SessionRow: View {
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(statusColor)
 
-            Image(systemName: "arrow.up.forward")
+            Image(
+                systemName: session.provider == .claudeCode
+                    ? "info.circle"
+                    : "arrow.up.forward"
+            )
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .opacity(isHovered ? 0.90 : 0.34)
@@ -278,7 +286,7 @@ private struct SessionRow: View {
         }
         .padding(.horizontal, 12)
         .frame(height: SessionPanelLayout.rowHeight)
-        .background(Color.primary.opacity(isHovered ? 0.052 : 0))
+        .background(rowBackground)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .animation(.easeOut(duration: 0.14), value: isHovered)
@@ -310,13 +318,12 @@ private struct SessionRow: View {
         case .blocked: BotState.blocked.petAccent
         }
     }
-}
 
-private extension AgentProvider {
-    var shortDisplayName: String {
-        switch self {
-        case .codex: "Codex"
-        case .claudeCode: "Claude"
+    private var rowBackground: some View {
+        ZStack {
+            session.provider.visualTint
+                .opacity(colorScheme == .dark ? 0.065 : 0.042)
+            Color.primary.opacity(isHovered ? 0.045 : 0)
         }
     }
 }

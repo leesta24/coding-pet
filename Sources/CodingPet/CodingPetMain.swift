@@ -62,12 +62,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let updatedAt: Date
     }
 
+    private struct ClaudeReadyCandidate: Sendable {
+        let sessionID: String
+        let completedAt: Date
+    }
+
     private static let lifecycleReconciliationInterval: UInt64 = 3_000_000_000
     private static let catalogReconciliationFrequency = 5
 
     private let sessionStore: SessionStore
     private let eventSnapshotStore = HookEventSnapshotStore()
     private let codexSessionNameResolver = CodexSessionNameResolver()
+    private let claudeSessionNameResolver = ClaudeSessionNameResolver()
     private let codexActivityMessageResolver = CodexActivityMessageResolver()
     private let codexThreadCatalog = CodexThreadCatalog()
     private let codexUnreadStateReader = CodexUnreadStateReader()
@@ -86,10 +92,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let resolver = codexSessionNameResolver
+        let claudeResolver = claudeSessionNameResolver
         let isDemo = CommandLine.arguments.contains("--demo")
         let storedEvents = isDemo ? [] : eventSnapshotStore.snapshots()
         hookEventListener = try? HookEventListener { [weak self] event in
-            self?.apply(event, resolvingNameWith: resolver)
+            self?.apply(
+                event,
+                codexNameResolver: resolver,
+                claudeNameResolver: claudeResolver
+            )
         }
         let snapshots = eventSnapshotStore
         botWindowController = BotWindowController(
@@ -104,7 +115,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         botWindowController?.show()
 
         if !isDemo {
-            startSessionReconciliation(storedEvents: storedEvents, resolver: resolver)
+            startSessionReconciliation(
+                storedEvents: storedEvents,
+                codexNameResolver: resolver,
+                claudeNameResolver: claudeResolver
+            )
         }
     }
 
@@ -115,7 +130,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startSessionReconciliation(
         storedEvents: [HookEventEnvelope],
-        resolver: CodexSessionNameResolver
+        codexNameResolver: CodexSessionNameResolver,
+        claudeNameResolver: ClaudeSessionNameResolver
     ) {
         let catalog = codexThreadCatalog
         sessionReconciliationTask = Task { [weak self] in
@@ -124,9 +140,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.restoreSnapshots(
                 storedEvents,
                 activeCodexThreadIDs: initialThreadIDs,
-                resolver: resolver
+                codexNameResolver: codexNameResolver,
+                claudeNameResolver: claudeNameResolver
             )
             await self?.synchronizeCodexReadySessions(using: catalog)
+            await self?.synchronizeClaudeReadySessions(using: claudeNameResolver)
 
             var reconciliationCount = 0
             while !Task.isCancelled {
@@ -136,6 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard !Task.isCancelled else { return }
 
                 await self?.synchronizeCodexReadySessions(using: catalog)
+                await self?.synchronizeClaudeReadySessions(using: claudeNameResolver)
 
                 let candidates = self?.codexLifecycleCandidates() ?? []
                 for candidate in candidates {
@@ -194,6 +213,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func synchronizeClaudeReadySessions(
+        using resolver: ClaudeSessionNameResolver
+    ) async {
+        let candidates: [ClaudeReadyCandidate] = sessionStore.sessions.compactMap { session in
+            guard session.provider == .claudeCode,
+                  session.status == .ready else {
+                return nil
+            }
+            return ClaudeReadyCandidate(
+                sessionID: session.providerSessionID,
+                completedAt: session.updatedAt
+            )
+        }
+
+        for candidate in candidates {
+            guard !Task.isCancelled else { return }
+            guard await resolver.isReadySessionRead(
+                sessionID: candidate.sessionID,
+                completedAt: candidate.completedAt
+            ) == true else {
+                continue
+            }
+            guard sessionStore.removeSession(
+                provider: .claudeCode,
+                providerSessionID: candidate.sessionID,
+                notUpdatedAfter: candidate.completedAt
+            ) != nil else {
+                continue
+            }
+            eventSnapshotStore.remove(
+                provider: .claudeCode,
+                sessionID: candidate.sessionID
+            )
+        }
+    }
+
     private func removeTerminatedCodexSession(
         _ candidate: CodexLifecycleCandidate,
         completedAt: Date
@@ -214,7 +269,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func restoreSnapshots(
         _ events: [HookEventEnvelope],
         activeCodexThreadIDs: Set<String>?,
-        resolver: CodexSessionNameResolver
+        codexNameResolver: CodexSessionNameResolver,
+        claudeNameResolver: ClaudeSessionNameResolver
     ) {
         let reconciliation = SessionSnapshotReconciler.reconcile(
             events,
@@ -224,7 +280,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             eventSnapshotStore.remove(provider: route.provider, sessionID: route.sessionID)
         }
         for event in reconciliation.restorableEvents {
-            apply(event, resolvingNameWith: resolver)
+            apply(
+                event,
+                codexNameResolver: codexNameResolver,
+                claudeNameResolver: claudeNameResolver
+            )
         }
     }
 
@@ -240,17 +300,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func apply(
         _ event: HookEventEnvelope,
-        resolvingNameWith resolver: CodexSessionNameResolver
+        codexNameResolver: CodexSessionNameResolver,
+        claudeNameResolver: ClaudeSessionNameResolver
     ) {
         sessionStore.apply(event)
-        guard event.provider == .codex,
-              !event.clearsActiveSession else { return }
+        guard !event.clearsActiveSession else { return }
 
         let id = SessionEventRouter.sessionIdentifier(
             provider: event.provider,
             sessionID: event.sessionID
         )
-        if event.eventName == "PreToolUse" || event.eventName == "PostToolUse" {
+        if event.provider == .codex,
+           (event.eventName == "PreToolUse" || event.eventName == "PostToolUse") {
             let activityResolver = codexActivityMessageResolver
             Task { @MainActor [weak sessionStore] in
                 guard let message = await activityResolver.latestMessage(
@@ -265,16 +326,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             }
         }
-        let refresh = event.eventName == "SessionStart"
-            || event.eventName == "UserPromptSubmit"
-        Task { @MainActor [weak sessionStore] in
-            guard let name = await resolver.name(
-                for: event.sessionID,
-                refresh: refresh
-            ) else {
-                return
+        switch event.provider {
+        case .codex:
+            let refresh = event.eventName == "SessionStart"
+                || event.eventName == "UserPromptSubmit"
+            Task { @MainActor [weak sessionStore] in
+                guard let name = await codexNameResolver.name(
+                    for: event.sessionID,
+                    refresh: refresh
+                ) else {
+                    return
+                }
+                sessionStore?.updateSessionName(name, for: id)
             }
-            sessionStore?.updateSessionName(name, for: id)
+        case .claudeCode:
+            Task { @MainActor [weak sessionStore] in
+                guard let name = await claudeNameResolver.name(
+                    for: event.sessionID,
+                    processID: event.parentProcessID,
+                    refresh: true
+                ) else {
+                    return
+                }
+                sessionStore?.updateSessionName(name, for: id)
+            }
         }
     }
 }

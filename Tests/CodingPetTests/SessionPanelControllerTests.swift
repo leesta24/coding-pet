@@ -274,6 +274,92 @@ struct SessionPanelControllerTests {
     }
 
     @Test
+    func claudeBubbleShowsNoticeWithoutNavigatingOrOpeningFinder() {
+        let claude = AgentSession(
+            id: "claude-code:session",
+            provider: .claudeCode,
+            projectName: "project",
+            cwd: "/tmp/project",
+            status: .running,
+            summary: "Working",
+            updatedAt: .now,
+            terminal: nil
+        )
+        let store = SessionStore(sessions: [claude])
+        var navigationCount = 0
+        let controller = BotWindowController(
+            store: store,
+            navigateToSession: { _ in navigationCount += 1 }
+        )
+
+        controller.handleBubbleActivation(claude)
+
+        #expect(navigationCount == 0)
+        #expect(controller.isNavigationNoticeVisible)
+        #expect(store.sessions == [claude])
+    }
+
+    @Test
+    func claudePanelSelectionUsesUnavailableNoticeInsteadOfNavigation() {
+        let claude = AgentSession(
+            id: "claude-code:session",
+            provider: .claudeCode,
+            projectName: "project",
+            cwd: "/tmp/project",
+            status: .running,
+            summary: "Working",
+            updatedAt: .now,
+            terminal: nil
+        )
+        let store = SessionStore(sessions: [claude])
+        var navigationCount = 0
+        var noticeCount = 0
+        let controller = SessionPanelController(
+            store: store,
+            navigateToSession: { _ in navigationCount += 1 },
+            onNavigationUnavailable: { _, _ in noticeCount += 1 }
+        )
+
+        controller.handleSessionActivation(claude)
+
+        #expect(navigationCount == 0)
+        #expect(noticeCount == 1)
+        #expect(store.sessions == [claude])
+    }
+
+    @Test
+    func navigationNoticePrefersTheLeftSideWithoutOverlappingItsAnchor() {
+        let visibleFrame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        let anchorFrame = NSRect(x: 900, y: 320, width: 328, height: 152)
+
+        let noticeFrame = SessionNavigationNoticeController.noticeFrame(
+            beside: anchorFrame,
+            visibleFrame: visibleFrame,
+            preferredCenterY: 400
+        )
+
+        #expect(noticeFrame.maxX == anchorFrame.minX - 12)
+        #expect(!noticeFrame.intersects(anchorFrame))
+        #expect(visibleFrame.contains(noticeFrame))
+    }
+
+    @Test
+    func navigationNoticeMovesRightWhenTheAnchorIsNearTheLeftEdge() {
+        let visibleFrame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        let anchorFrame = NSRect(x: 20, y: 320, width: 404, height: 184)
+
+        let noticeFrame = SessionNavigationNoticeController.noticeFrame(
+            beside: anchorFrame,
+            visibleFrame: visibleFrame,
+            preferredCenterY: 400
+        )
+
+        #expect(noticeFrame.minX == anchorFrame.maxX + 12)
+        #expect(!noticeFrame.intersects(anchorFrame))
+        #expect(visibleFrame.contains(noticeFrame))
+    }
+
+    @Test
     func dismissingBubbleKeepsSessionAndDoesNotNavigate() {
         let running = bubbleSession(id: "running", status: .running)
         let store = SessionStore(sessions: [running])

@@ -41,7 +41,10 @@ struct AgentSession: Identifiable, Codable, Hashable, Sendable {
     var terminal: TerminalTarget?
 
     var displayName: String {
-        sessionName ?? projectName
+        if let sessionName, !sessionName.isEmpty {
+            return sessionName
+        }
+        return provider == .claudeCode ? "Untitled session" : projectName
     }
 
     var providerSessionID: String {

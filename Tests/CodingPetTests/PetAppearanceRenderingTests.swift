@@ -6,6 +6,22 @@ import Testing
 @MainActor
 struct PetAppearanceRenderingTests {
     @Test
+    func rendersClaudeSessionNavigationNotice() throws {
+        let preview = SessionNavigationNoticeView()
+            .background(Color(red: 0.88, green: 0.90, blue: 0.94))
+            .environment(\.colorScheme, .light)
+
+        let pngData = try renderPNG(preview)
+
+        #expect(pngData.count > 5_000)
+        if let outputPath = ProcessInfo.processInfo.environment[
+            "CODINGPET_NAVIGATION_NOTICE_PREVIEW_PATH"
+        ] {
+            try pngData.write(to: URL(filePath: outputPath), options: .atomic)
+        }
+    }
+
+    @Test
     func rendersAllAppearancesAndTheSessionPanel() throws {
         let suiteName = "PetAppearanceRenderingTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -393,12 +409,12 @@ struct PetAppearanceRenderingTests {
                 terminal: nil
             ),
             AgentSession(
-                id: "codex:running-preview",
-                provider: .codex,
+                id: "claude-code:running-preview",
+                provider: .claudeCode,
                 projectName: "比较 review skill 差异",
                 cwd: "/tmp/coding-pet",
-                status: .running,
-                summary: "Planning hybrid single-agent with optional parallel mode",
+                status: .ready,
+                summary: "Completed — ready to review",
                 updatedAt: .now.addingTimeInterval(-1),
                 terminal: nil
             )
