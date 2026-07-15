@@ -12,7 +12,8 @@ enum CodingPetHookMain {
               let event = try? HookEventSanitizer.sanitize(
                   input,
                   provider: provider,
-                  parentProcessID: getppid()
+                  parentProcessID: getppid(),
+                  environment: ProcessInfo.processInfo.environment
               ) else {
             return
         }

@@ -38,18 +38,32 @@ struct AgentSession: Identifiable, Codable, Hashable, Sendable {
     var status: SessionStatus
     var summary: String
     var updatedAt: Date
+    var turnStartedAt: Date? = nil
     var terminal: TerminalTarget?
+    var codexThreadIsPersisted: Bool? = nil
 
     var displayName: String {
         if let sessionName, !sessionName.isEmpty {
             return sessionName
         }
-        return provider == .claudeCode ? "Untitled session" : projectName
+        if provider == .claudeCode {
+            return "Untitled session"
+        }
+        let trimmedProjectName = projectName.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        return trimmedProjectName.isEmpty || trimmedProjectName == "/"
+            ? "Codex task"
+            : trimmedProjectName
     }
 
     var providerSessionID: String {
         guard let separator = id.firstIndex(of: ":") else { return id }
         return String(id[id.index(after: separator)...])
+    }
+
+    var elapsedReferenceDate: Date {
+        status == .running ? turnStartedAt ?? updatedAt : updatedAt
     }
 }
 

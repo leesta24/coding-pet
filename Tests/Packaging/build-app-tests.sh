@@ -6,6 +6,15 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 temporary_directory="$(mktemp -d "${TMPDIR:-/tmp}/codingpet-build-test.XXXXXX")"
 trap 'rm -rf "$temporary_directory"' EXIT
 
+test -f "$repo_root/scripts/render-dmg-background.swift"
+test -f "$repo_root/scripts/layout-dmg.applescript"
+grep -q 'format UDRW' "$repo_root/scripts/release-dmg.sh"
+grep -q 'hdiutil convert' "$repo_root/scripts/release-dmg.sh"
+grep -q 'volume_name="CodingPet \$version"' "$repo_root/scripts/release-dmg.sh"
+grep -q 'layout_volume_name=' "$repo_root/scripts/release-dmg.sh"
+grep -q 'diskutil renameVolume' "$repo_root/scripts/release-dmg.sh"
+grep -q 'background picture' "$repo_root/scripts/layout-dmg.applescript"
+
 CODINGPET_DIST_DIR="$temporary_directory" \
 CODINGPET_VERSION="0.1.0" \
 CODINGPET_BUILD_NUMBER="1" \

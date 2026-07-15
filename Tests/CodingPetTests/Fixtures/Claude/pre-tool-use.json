@@ -1,0 +1,12 @@
+{
+  "session_id": "claude-session-1",
+  "transcript_path": "/private/secret/claude-transcript.jsonl",
+  "cwd": "/Users/example/Projects/coding-pet",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "/private/secret/source.swift",
+    "old_string": "private source",
+    "new_string": "private replacement"
+  }
+}

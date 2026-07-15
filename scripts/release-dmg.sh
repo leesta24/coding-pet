@@ -76,24 +76,62 @@ hook="$app/Contents/Helpers/CodingPetHook"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$app"
 
 staging_directory="$(mktemp -d "${TMPDIR:-/tmp}/codingpet-dmg.XXXXXX")"
-trap 'rm -rf "$staging_directory"' EXIT
+mount_directory="$(mktemp -d "${TMPDIR:-/tmp}/codingpet-mount.XXXXXX")"
+writable_dmg="$dist_directory/.CodingPet-$version-layout.dmg"
+volume_name="CodingPet $version"
+layout_volume_name="CodingPet Layout $version $$"
+mounted_device=""
+cleanup() {
+    if [[ -n "$mounted_device" ]]; then
+        /usr/bin/hdiutil detach "$mounted_device" -quiet || true
+    fi
+    rm -rf "$staging_directory" "$mount_directory"
+    rm -f "$writable_dmg"
+}
+trap cleanup EXIT
 /usr/bin/ditto "$app" "$staging_directory/CodingPet.app"
 /bin/ln -s /Applications "$staging_directory/Applications"
+/bin/mkdir -p "$staging_directory/.background"
+/usr/bin/xcrun swift "$repo_root/scripts/render-dmg-background.swift" \
+    "$staging_directory/.background/dmg-background.png"
+/usr/bin/install -m 644 "$repo_root/Packaging/AppIcon.icns" \
+    "$staging_directory/.VolumeIcon.icns"
 
 if [[ "$skip_notarization" == true ]]; then
     dmg="$dist_directory/CodingPet-$version-arm64-UNNOTARIZED.dmg"
 else
     dmg="$dist_directory/CodingPet-$version-arm64.dmg"
 fi
-rm -f "$dmg" "$dmg.sha256"
+rm -f "$dmg" "$dmg.sha256" "$writable_dmg"
 
 /usr/bin/hdiutil create \
-    -volname "CodingPet" \
+    -volname "$layout_volume_name" \
     -srcfolder "$staging_directory" \
+    -fs HFS+ \
+    -format UDRW \
+    -ov \
+    "$writable_dmg" >/dev/null
+
+mounted_device="$(/usr/bin/hdiutil attach "$writable_dmg" \
+    -mountpoint "$mount_directory" \
+    -readwrite \
+    -noverify \
+    -noautoopen \
+    -nobrowse | /usr/bin/awk '/^\/dev\// { print $1; exit }')"
+test -n "$mounted_device" || { echo "Could not mount writable DMG" >&2; exit 1; }
+
+/usr/bin/xcrun SetFile -a C "$mount_directory"
+/usr/bin/osascript "$repo_root/scripts/layout-dmg.applescript" "$mount_directory"
+/usr/sbin/diskutil renameVolume "$mount_directory" "$volume_name" >/dev/null
+/bin/sync
+/usr/bin/hdiutil detach "$mounted_device" -quiet
+mounted_device=""
+
+/usr/bin/hdiutil convert "$writable_dmg" \
     -format UDZO \
     -imagekey zlib-level=9 \
     -ov \
-    "$dmg" >/dev/null
+    -o "$dmg" >/dev/null
 /usr/bin/codesign --force --timestamp --sign "$identity" "$dmg"
 /usr/bin/codesign --verify --verbose=2 "$dmg"
 

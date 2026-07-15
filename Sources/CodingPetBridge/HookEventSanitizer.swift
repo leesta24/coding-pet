@@ -10,7 +10,8 @@ public enum HookEventSanitizer {
         _ data: Data,
         provider: HookProvider,
         timestamp: Date = .now,
-        parentProcessID: Int32?
+        parentProcessID: Int32?,
+        environment: [String: String] = [:]
     ) throws -> HookEventEnvelope {
         let payload: SourcePayload
         do {
@@ -29,6 +30,15 @@ public enum HookEventSanitizer {
             provider: provider,
             eventName: eventName,
             eventSubtype: safeSubtype(payload.notificationType ?? payload.source),
+            activityKind: provider == .claudeCode
+                ? activityKind(for: payload.toolName)
+                : nil,
+            clientSurface: provider == .claudeCode
+                ? clientSurface(environment: environment)
+                : nil,
+            terminalApplication: provider == .claudeCode
+                ? terminalApplication(environment["TERM_PROGRAM"])
+                : nil,
             timestamp: timestamp,
             parentProcessID: parentProcessID,
             sessionID: sessionID,
@@ -49,6 +59,56 @@ public enum HookEventSanitizer {
         guard value.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
         return value
     }
+
+    private static func activityKind(for toolName: String?) -> HookActivityKind? {
+        switch toolName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "bash": .command
+        case "edit", "notebookedit": .editing
+        case "write": .writing
+        case "read": .reading
+        case "grep", "glob": .searching
+        case "webfetch", "websearch": .browsing
+        case "task", "agent": .delegating
+        case "todowrite": .planning
+        default: nil
+        }
+    }
+
+    private static func clientSurface(
+        environment: [String: String]
+    ) -> HookClientSurface? {
+        let entrypoint = environment["CLAUDE_CODE_ENTRYPOINT"]?.lowercased()
+        if entrypoint?.contains("desktop") == true {
+            return .desktop
+        }
+        guard let terminal = terminalApplication(environment["TERM_PROGRAM"]) else {
+            return entrypoint == "cli" ? .terminal : nil
+        }
+        switch terminal {
+        case .visualStudioCode, .visualStudioCodeInsiders, .cursor:
+            return .editor
+        default:
+            return .terminal
+        }
+    }
+
+    private static func terminalApplication(
+        _ value: String?
+    ) -> HookTerminalApplication? {
+        switch value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "apple_terminal", "terminal", "terminal.app": .appleTerminal
+        case "iterm.app", "iterm2": .iTerm
+        case "warpterminal", "warp": .warp
+        case "vscode": .visualStudioCode
+        case "vscode-insiders": .visualStudioCodeInsiders
+        case "cursor": .cursor
+        case "ghostty": .ghostty
+        case "wezterm": .wezTerm
+        case "kitty": .kitty
+        case "alacritty": .alacritty
+        default: nil
+        }
+    }
 }
 
 private struct SourcePayload: Decodable {
@@ -57,6 +117,7 @@ private struct SourcePayload: Decodable {
     let cwd: String?
     let source: String?
     let notificationType: String?
+    let toolName: String?
 
     enum CodingKeys: String, CodingKey {
         case hookEventName = "hook_event_name"
@@ -64,5 +125,6 @@ private struct SourcePayload: Decodable {
         case cwd
         case source
         case notificationType = "notification_type"
+        case toolName = "tool_name"
     }
 }

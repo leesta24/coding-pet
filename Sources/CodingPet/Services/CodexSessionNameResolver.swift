@@ -1,10 +1,14 @@
 import Foundation
 
 actor CodexSessionNameResolver {
-    typealias Lookup = @Sendable (String) -> String?
+    struct Resolution: Equatable, Sendable {
+        let name: String?
+    }
+
+    typealias Lookup = @Sendable (String) -> Resolution?
 
     private let lookup: Lookup
-    private var cachedNames: [String: String] = [:]
+    private var cachedResolutions: [String: Resolution] = [:]
 
     init(codexExecutableURL: URL? = nil) {
         lookup = { sessionID in
@@ -24,7 +28,7 @@ actor CodexSessionNameResolver {
             ) else {
                 return nil
             }
-            return Self.extractName(from: result)
+            return Self.extractResolution(from: result)
         }
     }
 
@@ -32,20 +36,32 @@ actor CodexSessionNameResolver {
         self.lookup = lookup
     }
 
-    func name(for sessionID: String, refresh: Bool = false) async -> String? {
-        if !refresh, let cachedName = cachedNames[sessionID] {
-            return cachedName
+    func resolution(
+        for sessionID: String,
+        refresh: Bool = false
+    ) async -> Resolution? {
+        if !refresh, let cachedResolution = cachedResolutions[sessionID] {
+            return cachedResolution
         }
 
         let lookup = self.lookup
-        let resolvedName = await Task.detached(priority: .utility) {
+        let resolution = await Task.detached(priority: .utility) {
             lookup(sessionID)
         }.value
-        if let resolvedName {
-            cachedNames[sessionID] = resolvedName
-            return resolvedName
+        if let resolution {
+            cachedResolutions[sessionID] = resolution
+            return resolution
         }
-        return cachedNames[sessionID]
+        return cachedResolutions[sessionID]
+    }
+
+    func name(for sessionID: String, refresh: Bool = false) async -> String? {
+        await resolution(for: sessionID, refresh: refresh)?.name
+    }
+
+    static func extractResolution(from result: [String: Any]) -> Resolution? {
+        guard result["thread"] is [String: Any] else { return nil }
+        return Resolution(name: extractName(from: result))
     }
 
     static func extractName(from result: [String: Any]) -> String? {

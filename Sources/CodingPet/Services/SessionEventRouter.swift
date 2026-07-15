@@ -13,6 +13,14 @@ enum SessionEventRouter {
 
         let provider = agentProvider(for: event.provider)
         let terminal = terminalTarget(for: event, existing: existing)
+        let turnStartedAt: Date?
+        if event.eventName == "UserPromptSubmit" {
+            turnStartedAt = event.timestamp
+        } else if state.status == .running || state.status == .needsInput {
+            turnStartedAt = existing?.turnStartedAt ?? event.timestamp
+        } else {
+            turnStartedAt = nil
+        }
         return AgentSession(
             id: sessionIdentifier(provider: event.provider, sessionID: event.sessionID),
             provider: provider,
@@ -22,7 +30,9 @@ enum SessionEventRouter {
             status: state.status,
             summary: state.summary,
             updatedAt: event.timestamp,
-            terminal: terminal
+            turnStartedAt: turnStartedAt,
+            terminal: terminal,
+            codexThreadIsPersisted: existing?.codexThreadIsPersisted
         )
     }
 
@@ -48,18 +58,44 @@ enum SessionEventRouter {
 
     private static func projectName(for cwd: String) -> String {
         let name = URL(fileURLWithPath: cwd).lastPathComponent
-        return name.isEmpty ? cwd : name
+        return name.isEmpty || name == "/" ? "Codex task" : name
     }
 
     private static func terminalTarget(
         for event: HookEventEnvelope,
         existing: AgentSession?
     ) -> TerminalTarget? {
-        guard event.parentProcessID != nil || existing?.terminal != nil else { return nil }
+        let bundleIdentifier = bundleIdentifier(for: event)
+            ?? existing?.terminal?.bundleIdentifier
+        guard event.parentProcessID != nil
+                || bundleIdentifier != nil
+                || existing?.terminal != nil else {
+            return nil
+        }
         return TerminalTarget(
-            bundleIdentifier: existing?.terminal?.bundleIdentifier,
+            bundleIdentifier: bundleIdentifier,
             processIdentifier: event.parentProcessID ?? existing?.terminal?.processIdentifier,
             tty: existing?.terminal?.tty
         )
+    }
+
+    private static func bundleIdentifier(for event: HookEventEnvelope) -> String? {
+        guard event.provider == .claudeCode else { return nil }
+        if event.clientSurface == .desktop {
+            return "com.anthropic.claudefordesktop"
+        }
+        return switch event.terminalApplication {
+        case .appleTerminal: "com.apple.Terminal"
+        case .iTerm: "com.googlecode.iterm2"
+        case .warp: "dev.warp.Warp-Stable"
+        case .visualStudioCode: "com.microsoft.VSCode"
+        case .visualStudioCodeInsiders: "com.microsoft.VSCodeInsiders"
+        case .cursor: "com.todesktop.230313mzl4w4u92"
+        case .ghostty: "com.mitchellh.ghostty"
+        case .wezTerm: "com.github.wez.wezterm"
+        case .kitty: "net.kovidgoyal.kitty"
+        case .alacritty: "org.alacritty"
+        case nil: nil
+        }
     }
 }

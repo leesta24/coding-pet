@@ -19,9 +19,11 @@ editor or terminal.
 - **Stay out of the way** — a transparent always-on-top pet and compact bubbles
   remain visible across Spaces without becoming the key window.
 - **Jump back to work** — open an exact Codex App task when its thread ID is
-  available, with terminal and working-directory fallbacks for CLI sessions.
+  available, or return a Claude session to Claude Desktop, Terminal, iTerm,
+  Warp, VS Code, Cursor, Ghostty, WezTerm, Kitty, or Alacritty.
 - **Show useful progress** — display the latest structured Codex activity
-  message while a task is running, without parsing transcript files.
+  message and privacy-safe Claude activity labels while a task is running,
+  without parsing transcript files.
 - **Customize the companion** — choose a pet, resize it, control animations,
   and independently enable Running, Pending input, and Ready bubbles.
 - **Keep everything local** — no account, cloud service, analytics, telemetry,
@@ -36,8 +38,8 @@ editor or terminal.
 | Session display name | Codex local app-server | Claude local activity metadata |
 | Reversible per-provider hook install | Yes | Yes |
 | Completed attention state | Codex App unread state | Stop hook + Claude Desktop unread state |
-| Latest agent activity message | Codex local app-server | Not currently exposed |
-| Navigation | Exact Codex App task, then fallbacks | Direct navigation unavailable; shows a local notice |
+| Latest agent activity message | Codex local app-server | Allowlisted tool activity label |
+| Navigation | Exact Codex App task, then fallbacks | Claude Desktop or originating terminal/editor |
 | Usage window summary | Codex local app-server | Not currently exposed |
 
 CodingPet observes and navigates. Permission approvals and user replies always
@@ -179,10 +181,16 @@ Main source areas:
 ## Privacy
 
 Hook events contain only provider, event name, safe event subtype, timestamp,
-parent PID, session ID, and working directory. Prompt text, assistant replies,
-tool input, tool output, code, diffs, and transcript paths are removed before
-delivery. The Unix socket is per-user, permission restricted, local only, and
-message-size bounded.
+parent PID, session ID, working directory, and optional allowlisted activity,
+client-surface, and terminal-app identifiers. Prompt text, assistant replies,
+raw tool names, arbitrary environment values, tool input, tool output, code,
+diffs, and transcript paths are removed before delivery. The Unix socket is
+per-user, permission restricted, local only, and message-size bounded.
+
+Claude running/input sessions are reconciled against the captured parent PID,
+so an interrupted or terminated Claude process cannot leave a permanent
+working card when a final hook is missed. Completed Ready notifications remain
+visible until acknowledged or marked read.
 
 Codex-specific task names, unread IDs, activity messages, and usage windows are
 read from local Codex interfaces and remain on the Mac. Claude Desktop titles

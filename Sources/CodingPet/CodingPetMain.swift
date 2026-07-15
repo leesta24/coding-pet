@@ -143,6 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 codexNameResolver: codexNameResolver,
                 claudeNameResolver: claudeNameResolver
             )
+            self?.removeDeadClaudeSessions()
             await self?.synchronizeCodexReadySessions(using: catalog)
             await self?.synchronizeClaudeReadySessions(using: claudeNameResolver)
 
@@ -155,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
                 await self?.synchronizeCodexReadySessions(using: catalog)
                 await self?.synchronizeClaudeReadySessions(using: claudeNameResolver)
+                self?.removeDeadClaudeSessions()
 
                 let candidates = self?.codexLifecycleCandidates() ?? []
                 for candidate in candidates {
@@ -298,6 +300,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func removeDeadClaudeSessions() {
+        let removed = sessionStore.removeDeadClaudeSessions()
+        for session in removed {
+            eventSnapshotStore.remove(
+                provider: .claudeCode,
+                sessionID: session.providerSessionID
+            )
+        }
+    }
+
     private func apply(
         _ event: HookEventEnvelope,
         codexNameResolver: CodexSessionNameResolver,
@@ -331,13 +343,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let refresh = event.eventName == "SessionStart"
                 || event.eventName == "UserPromptSubmit"
             Task { @MainActor [weak sessionStore] in
-                guard let name = await codexNameResolver.name(
+                guard let resolution = await codexNameResolver.resolution(
                     for: event.sessionID,
                     refresh: refresh
                 ) else {
                     return
                 }
-                sessionStore?.updateSessionName(name, for: id)
+                sessionStore?.markCodexThreadPersisted(for: id)
+                if let name = resolution.name {
+                    sessionStore?.updateSessionName(name, for: id)
+                }
             }
         case .claudeCode:
             Task { @MainActor [weak sessionStore] in

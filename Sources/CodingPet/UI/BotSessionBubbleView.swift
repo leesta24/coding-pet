@@ -230,9 +230,9 @@ private struct DismissibleSessionBubble: View {
             }
             .buttonStyle(BubbleButtonStyle())
             .help(
-                session.provider == .claudeCode
-                    ? "Claude Code sessions cannot be opened directly"
-                    : "Open \(session.displayName)"
+                SessionNavigator.supportsDirectActivation(session)
+                    ? "Open \(session.displayName)"
+                    : "No application target is available for \(session.displayName)"
             )
 
             Button(action: onDismiss) {

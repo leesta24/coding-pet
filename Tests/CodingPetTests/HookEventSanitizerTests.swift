@@ -53,6 +53,53 @@ struct HookEventSanitizerTests {
     }
 
     @Test
+    func claudeToolPayloadKeepsOnlyAllowlistedActivityAndClientMetadata() throws {
+        let data = try fixtureData("Claude/pre-tool-use.json")
+        let event = try HookEventSanitizer.sanitize(
+            data,
+            provider: .claudeCode,
+            timestamp: .distantPast,
+            parentProcessID: 99,
+            environment: [
+                "CLAUDE_CODE_ENTRYPOINT": "cli",
+                "TERM_PROGRAM": "Apple_Terminal"
+            ]
+        )
+
+        #expect(event.activityKind == .editing)
+        #expect(event.clientSurface == .terminal)
+        #expect(event.terminalApplication == .appleTerminal)
+
+        let encoded = try HookEventCodec.encode(event)
+        let json = String(decoding: encoded, as: UTF8.self)
+        #expect(!json.contains("tool_name"))
+        #expect(!json.contains("tool_input"))
+        #expect(!json.contains("source.swift"))
+        #expect(!json.contains("private source"))
+        #expect(!json.contains("CLAUDE_CODE_ENTRYPOINT"))
+        #expect(!json.contains("TERM_PROGRAM"))
+    }
+
+    @Test
+    func claudeDesktopSurfaceIsRecognizedWithoutPersistingRawEnvironment() throws {
+        let data = try fixtureData("Claude/user-prompt-submit.json")
+        let event = try HookEventSanitizer.sanitize(
+            data,
+            provider: .claudeCode,
+            parentProcessID: 100,
+            environment: [
+                "CLAUDE_CODE_ENTRYPOINT": "claude-desktop",
+                "TERM_PROGRAM": "Untrusted Secret Terminal"
+            ]
+        )
+
+        #expect(event.clientSurface == .desktop)
+        #expect(event.terminalApplication == nil)
+        #expect(!String(decoding: try HookEventCodec.encode(event), as: UTF8.self)
+            .contains("Untrusted Secret Terminal"))
+    }
+
+    @Test
     func missingRoutingFieldsAreRejected() {
         let data = Data(#"{"hook_event_name":"Stop","cwd":"/tmp"}"#.utf8)
 

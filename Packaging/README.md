@@ -46,6 +46,16 @@ CODINGPET_BUILD_NUMBER="1" \
   scripts/release-dmg.sh
 ```
 
+The release script builds a branded Finder disk image with a fixed 660×420
+window, hidden toolbar and status bar, a generated CodingPet background, and
+positioned CodingPet/Applications icons. The mounted volume includes the app
+version in its name so Finder cannot confuse a new installer with an older
+CodingPet image that is still mounted. Layout is applied under a unique
+temporary volume name before the image is renamed to its public versioned
+name. The background is generated locally
+from `scripts/render-dmg-background.swift`; no third-party DMG tooling is
+required.
+
 The script also accepts App Store Connect API-key inputs through
 `ASC_KEY_PATH`, `ASC_KEY_ID`, and `ASC_ISSUER_ID`. It signs the hook before the
 containing app, signs the DMG, waits for notarization, staples the ticket, runs

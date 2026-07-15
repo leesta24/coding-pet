@@ -24,13 +24,26 @@ struct CodexSessionNameResolverTests {
     @Test
     func cachesNamesUntilARefreshIsRequested() async {
         let lookup = NameLookupSequence(values: ["First title", "Renamed title"])
-        let resolver = CodexSessionNameResolver { _ in lookup.next() }
+        let resolver = CodexSessionNameResolver { _ in
+            lookup.next().map(CodexSessionNameResolver.Resolution.init(name:))
+        }
 
         #expect(await resolver.name(for: "thread") == "First title")
         #expect(await resolver.name(for: "thread") == "First title")
         #expect(lookup.callCount == 1)
         #expect(await resolver.name(for: "thread", refresh: true) == "Renamed title")
         #expect(lookup.callCount == 2)
+    }
+
+
+    @Test
+    func recognizesPersistedUnnamedThreads() {
+        let resolution = CodexSessionNameResolver.extractResolution(from: [
+            "thread": ["name": "   ", "preview": "private first prompt"]
+        ])
+
+        #expect(resolution != nil)
+        #expect(resolution?.name == nil)
     }
 }
 

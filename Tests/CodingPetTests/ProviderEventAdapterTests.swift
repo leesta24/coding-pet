@@ -54,6 +54,111 @@ struct ProviderEventAdapterTests {
     }
 
     @Test
+    func claudeToolActivityUsesAllowlistedSummaryAndPreservesTurnStart() throws {
+        let promptTime = Date(timeIntervalSince1970: 100)
+        let toolTime = Date(timeIntervalSince1970: 112)
+        let prompt = HookEventEnvelope(
+            provider: .claudeCode,
+            eventName: "UserPromptSubmit",
+            timestamp: promptTime,
+            parentProcessID: 42,
+            sessionID: "turn",
+            cwd: "/tmp/project"
+        )
+        let first = try #require(SessionEventRouter.session(for: prompt, existing: nil))
+        let tool = HookEventEnvelope(
+            provider: .claudeCode,
+            eventName: "PreToolUse",
+            activityKind: .editing,
+            timestamp: toolTime,
+            parentProcessID: 42,
+            sessionID: "turn",
+            cwd: "/tmp/project"
+        )
+
+        let updated = try #require(SessionEventRouter.session(for: tool, existing: first))
+
+        #expect(first.turnStartedAt == promptTime)
+        #expect(updated.turnStartedAt == promptTime)
+        #expect(updated.updatedAt == toolTime)
+        #expect(updated.summary == "Editing files")
+        #expect(updated.elapsedReferenceDate == promptTime)
+    }
+
+    @Test
+    func aNewPromptResetsTheTurnStartTime() throws {
+        let first = AgentSession(
+            id: "claude-code:turn",
+            provider: .claudeCode,
+            projectName: "project",
+            cwd: "/tmp/project",
+            status: .running,
+            summary: "Working",
+            updatedAt: Date(timeIntervalSince1970: 100),
+            turnStartedAt: Date(timeIntervalSince1970: 100),
+            terminal: nil
+        )
+        let promptTime = Date(timeIntervalSince1970: 200)
+        let prompt = HookEventEnvelope(
+            provider: .claudeCode,
+            eventName: "UserPromptSubmit",
+            timestamp: promptTime,
+            parentProcessID: 42,
+            sessionID: "turn",
+            cwd: "/tmp/project"
+        )
+
+        let updated = try #require(SessionEventRouter.session(for: prompt, existing: first))
+
+        #expect(updated.turnStartedAt == promptTime)
+    }
+
+    @Test
+    @MainActor
+    func deadClaudeProcessesRemoveOnlyLiveLifecycleRows() {
+        let deadRunning = makeSession(
+            id: "claude-code:dead-running",
+            provider: .claudeCode,
+            status: .running,
+            processIdentifier: 41
+        )
+        let deadInput = makeSession(
+            id: "claude-code:dead-input",
+            provider: .claudeCode,
+            status: .needsInput,
+            processIdentifier: 42
+        )
+        let ready = makeSession(
+            id: "claude-code:ready",
+            provider: .claudeCode,
+            status: .ready,
+            processIdentifier: 43
+        )
+        let codex = makeSession(
+            id: "codex:dead",
+            provider: .codex,
+            status: .running,
+            processIdentifier: 44
+        )
+        let unknown = makeSession(
+            id: "claude-code:unknown",
+            provider: .claudeCode,
+            status: .running,
+            processIdentifier: nil
+        )
+        let store = SessionStore(sessions: [deadRunning, deadInput, ready, codex, unknown])
+
+        let removed = store.removeDeadClaudeSessions { pid in
+            pid == 43 ? true : false
+        }
+
+        #expect(Set(removed.map(\.id)) == ["claude-code:dead-running", "claude-code:dead-input"])
+        #expect(Set(store.sessions.map(\.id)) == [
+            "claude-code:ready", "codex:dead", "claude-code:unknown"
+        ])
+    }
+
+    @Test
     func unknownEventsAreIgnored() {
         let event = HookEventEnvelope(
             provider: .codex,
@@ -311,6 +416,23 @@ struct ProviderEventAdapterTests {
     }
 
     @Test
+    func rootWorkingDirectoryNeverAppearsAsACodexTitle() {
+        let event = HookEventEnvelope(
+            provider: .codex,
+            eventName: "UserPromptSubmit",
+            timestamp: .now,
+            parentProcessID: nil,
+            sessionID: "cloud-task",
+            cwd: "/"
+        )
+
+        let session = SessionEventRouter.session(for: event, existing: nil)
+
+        #expect(session?.projectName == "Codex task")
+        #expect(session?.displayName == "Codex task")
+    }
+
+    @Test
     @MainActor
     func latestMessageUpdatesOnlyTheMatchingRunningLifecycleEvent() {
         let timestamp = Date.now
@@ -526,6 +648,28 @@ struct ProviderEventAdapterTests {
             summary: "Test",
             updatedAt: .now,
             terminal: nil
+        )
+    }
+
+    private func makeSession(
+        id: String,
+        provider: AgentProvider,
+        status: SessionStatus,
+        processIdentifier: Int32?
+    ) -> AgentSession {
+        AgentSession(
+            id: id,
+            provider: provider,
+            projectName: "project",
+            cwd: "/tmp/project",
+            status: status,
+            summary: "Test",
+            updatedAt: .now,
+            terminal: TerminalTarget(
+                bundleIdentifier: nil,
+                processIdentifier: processIdentifier,
+                tty: nil
+            )
         )
     }
 }

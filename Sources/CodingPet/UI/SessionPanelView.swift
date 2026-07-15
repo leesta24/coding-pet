@@ -96,9 +96,9 @@ struct SessionPanelView: View {
                     }
                     .buttonStyle(.plain)
                     .help(
-                        session.provider == .claudeCode
-                            ? "Claude Code sessions cannot be opened directly"
-                            : "Open \(session.displayName)"
+                        SessionNavigator.supportsDirectActivation(session)
+                            ? "Open \(session.displayName)"
+                            : "No application target is available for \(session.displayName)"
                     )
 
                     if index < sortedSessions.count - 1 {
@@ -261,7 +261,7 @@ private struct SessionRow: View {
                     Text(session.summary)
                         .lineLimit(1)
                     Text("·")
-                    Text(session.updatedAt, style: .relative)
+                    Text(session.elapsedReferenceDate, style: .relative)
                         .monospacedDigit()
                 }
                 .font(.system(size: 10.5, weight: .regular))
@@ -275,9 +275,9 @@ private struct SessionRow: View {
                 .foregroundStyle(statusColor)
 
             Image(
-                systemName: session.provider == .claudeCode
-                    ? "info.circle"
-                    : "arrow.up.forward"
+                systemName: SessionNavigator.supportsDirectActivation(session)
+                    ? "arrow.up.forward"
+                    : "info.circle"
             )
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.secondary)

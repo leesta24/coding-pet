@@ -81,6 +81,14 @@ final class SessionStore: ObservableObject {
         sessions[index].sessionName = trimmed
     }
 
+    func markCodexThreadPersisted(for id: String) {
+        guard let index = sessions.firstIndex(where: { $0.id == id }),
+              sessions[index].provider == .codex else {
+            return
+        }
+        sessions[index].codexThreadIsPersisted = true
+    }
+
     func updateRunningSummary(
         _ summary: String,
         for id: String,
@@ -126,6 +134,31 @@ final class SessionStore: ObservableObject {
         for session in sessions {
             if session.provider == provider,
                !activeProviderSessionIDs.contains(session.providerSessionID) {
+                removed.append(session)
+            } else {
+                retained.append(session)
+            }
+        }
+        sessions = retained
+        for session in removed {
+            dismissedBubbleVersions.removeValue(forKey: session.id)
+        }
+        return removed
+    }
+
+    @discardableResult
+    func removeDeadClaudeSessions(
+        isAlive: (Int32) -> Bool = ProcessLivenessChecker.isAlive
+    ) -> [AgentSession] {
+        var retained: [AgentSession] = []
+        var removed: [AgentSession] = []
+        for session in sessions {
+            let isLiveLifecycleState = session.status == .running
+                || session.status == .needsInput
+            if session.provider == .claudeCode,
+               isLiveLifecycleState,
+               let processIdentifier = session.terminal?.processIdentifier,
+               !isAlive(processIdentifier) {
                 removed.append(session)
             } else {
                 retained.append(session)
@@ -202,7 +235,8 @@ final class SessionStore: ObservableObject {
             status: .ready,
             summary: "Completed — unread activity",
             updatedAt: metadata.updatedAt,
-            terminal: nil
+            terminal: nil,
+            codexThreadIsPersisted: true
         ))
     }
 
