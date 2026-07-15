@@ -12,7 +12,10 @@ final class SettingsWindowController {
         appearanceStore: PetAppearanceStore,
         bubbleSettingsStore: SessionBubbleSettingsStore = SessionBubbleSettingsStore(),
         hookExecutableURL: URL? = nil,
-        integrationStore: IntegrationSettingsStore? = nil
+        integrationStore: IntegrationSettingsStore? = nil,
+        onQuit: @escaping @MainActor () -> Void = {
+            NSApp.terminate(nil)
+        }
     ) {
         let hookURL = hookExecutableURL ?? AppBundlePaths.hookExecutableURL
         let resolvedIntegrationStore = integrationStore ?? IntegrationSettingsStore(
@@ -33,7 +36,7 @@ final class SettingsWindowController {
         window.collectionBehavior = [.moveToActiveSpace]
         window.minSize = NSSize(width: 720, height: 650)
         window.contentView = NSHostingView(
-            rootView: SettingsView()
+            rootView: SettingsView(onQuit: onQuit)
                 .environmentObject(sessionStore)
                 .environmentObject(appearanceStore)
                 .environmentObject(bubbleSettingsStore)

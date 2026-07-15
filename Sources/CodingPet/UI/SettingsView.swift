@@ -7,6 +7,11 @@ struct SettingsView: View {
     @EnvironmentObject private var bubbleSettingsStore: SessionBubbleSettingsStore
     @EnvironmentObject private var integrationStore: IntegrationSettingsStore
     @State private var selection: SettingsDestination = .appearance
+    let onQuit: () -> Void
+
+    init(onQuit: @escaping () -> Void = {}) {
+        self.onQuit = onQuit
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -65,6 +70,33 @@ struct SettingsView: View {
             }
 
             Spacer()
+
+            Button(role: .destructive, action: onQuit) {
+                HStack(spacing: 9) {
+                    Image(systemName: "power")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .frame(width: 18)
+                    Text("Quit")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 32)
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .background(
+                Color.primary.opacity(0.035),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary.opacity(0.07), lineWidth: 1)
+            )
+            .keyboardShortcut("q", modifiers: .command)
+            .help("Quit CodingPet")
 
             Text("Local-first companion")
                 .font(.system(size: 10.5, weight: .medium))

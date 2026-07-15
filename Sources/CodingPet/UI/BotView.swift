@@ -8,6 +8,7 @@ struct BotView: View {
     @State private var isHovered = false
 
     let onTap: () -> Void
+    let onQuit: () -> Void
 
     private var botSize: CGFloat { CGFloat(appearanceStore.botSize) }
 
@@ -26,6 +27,11 @@ struct BotView: View {
         }
         .buttonStyle(.plain)
         .help("Show CodingPet sessions")
+        .contextMenu {
+            Button(role: .destructive, action: onQuit) {
+                Label("Quit CodingPet", systemImage: "power")
+            }
+        }
         .onHover { isHovered = $0 }
         .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isHovered)
         .animation(.spring(response: 0.28, dampingFraction: 0.78), value: appearanceStore.selection)

@@ -419,6 +419,19 @@ struct SessionPanelControllerTests {
     }
 
     @Test
+    func botAndSettingsShareAnInjectableQuitAction() {
+        var quitCount = 0
+        let controller = BotWindowController(
+            store: SessionStore(),
+            quitApplication: { quitCount += 1 }
+        )
+
+        controller.quitApplication()
+
+        #expect(quitCount == 1)
+    }
+
+    @Test
     func botPrefersTheScreenContainingTheMousePointer() throws {
         let screen = try #require(
             NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }

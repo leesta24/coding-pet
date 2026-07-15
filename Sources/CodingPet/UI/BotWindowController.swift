@@ -21,6 +21,7 @@ final class BotWindowController {
     private let store: SessionStore
     private let onAcknowledge: @MainActor (AgentSession) -> Void
     private let navigateToSession: @MainActor (AgentSession) -> Void
+    private let quitHandler: @MainActor () -> Void
     private let appearanceStore: PetAppearanceStore
     private let bubbleSettingsStore: SessionBubbleSettingsStore
     nonisolated(unsafe) private var pointerEventMonitor: Any?
@@ -37,6 +38,9 @@ final class BotWindowController {
         onAcknowledge: @escaping @MainActor (AgentSession) -> Void = { _ in },
         navigateToSession: @escaping @MainActor (AgentSession) -> Void = {
             SessionNavigator.activate($0)
+        },
+        quitApplication: @escaping @MainActor () -> Void = {
+            NSApp.terminate(nil)
         }
     ) {
         let botWindowSide = CGFloat(appearanceStore.botSize) + 20
@@ -55,6 +59,7 @@ final class BotWindowController {
         self.store = store
         self.onAcknowledge = onAcknowledge
         self.navigateToSession = navigateToSession
+        quitHandler = quitApplication
         self.appearanceStore = appearanceStore
         self.bubbleSettingsStore = bubbleSettingsStore
         let hookURL = AppBundlePaths.hookExecutableURL
@@ -72,7 +77,8 @@ final class BotWindowController {
             appearanceStore: appearanceStore,
             bubbleSettingsStore: bubbleSettingsStore,
             hookExecutableURL: hookURL,
-            integrationStore: integrationStore
+            integrationStore: integrationStore,
+            onQuit: quitApplication
         )
         self.settingsWindow = settingsWindow
         let navigationNoticeController = SessionNavigationNoticeController()
@@ -98,9 +104,14 @@ final class BotWindowController {
         panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = Self.transparentHostingView(
-            rootView: BotView { [weak self] in
-                self?.handleBotActivation()
-            }
+            rootView: BotView(
+                onTap: { [weak self] in
+                    self?.handleBotActivation()
+                },
+                onQuit: { [weak self] in
+                    self?.quitApplication()
+                }
+            )
             .environmentObject(store)
             .environmentObject(appearanceStore)
         )
@@ -199,6 +210,10 @@ final class BotWindowController {
     func showSettings() {
         sessionPanel.hide()
         settingsWindow.show()
+    }
+
+    func quitApplication() {
+        quitHandler()
     }
 
     var isSettingsVisible: Bool {
