@@ -1,6 +1,7 @@
 # CodingPet
 
 [![CI](https://github.com/leesta24/coding-pet/actions/workflows/ci.yml/badge.svg)](https://github.com/leesta24/coding-pet/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/leesta24/coding-pet)](https://github.com/leesta24/coding-pet/releases/latest)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black)
 ![Apple silicon](https://img.shields.io/badge/Apple%20silicon-arm64-black)
 [![MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
@@ -94,14 +95,25 @@ $migrate-codex-custom-pet Migrate my user-created pet from ~/.codex/pets/my-pet.
 Restart CodingPet after adding or removing a local package so the Appearance
 gallery refreshes.
 
-## Requirements
+## Install
 
 - macOS 14 or later
 - Apple silicon
-- Xcode 26 or a compatible Swift 6.2 toolchain
 - Codex CLI and/or Claude Code CLI
 
+Download the latest `CodingPet-*-arm64.dmg` from
+[GitHub Releases](https://github.com/leesta24/coding-pet/releases/latest), open
+it, and drag CodingPet into **Applications**. Official DMGs are signed with a
+Developer ID certificate, notarized by Apple, and stapled so they can be
+installed normally without bypassing Gatekeeper.
+
+The public DMG includes the official 胖墩 appearance. Private local pets remain
+under `~/Library/Application Support/CodingPet/Pets` and are not bundled into
+the release.
+
 ## Build and run
+
+Building from source requires Xcode 26 or a compatible Swift 6.2 toolchain.
 
 Run directly with SwiftPM:
 
@@ -121,9 +133,6 @@ Build a conventional local application bundle:
 scripts/build-app.sh
 open dist/CodingPet.app
 ```
-
-Public DMG releases are intentionally deferred while the current interaction
-and session-lifecycle fixes are completed.
 
 ## Connect providers
 
