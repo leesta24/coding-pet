@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 struct CodexHookSnapshot {
@@ -243,6 +244,7 @@ final class CodexAppServerSession: CodexAppServerSessionProtocol {
     private let inputPipe = Pipe()
     private let outputPipe = Pipe()
     private let errorPipe = Pipe()
+    private let inputWriter: CodexAppServerInputWriter
     private let responses = CodexAppServerResponseBuffer()
     private let timeout: TimeInterval
     private var nextRequestID = 1
@@ -250,6 +252,9 @@ final class CodexAppServerSession: CodexAppServerSessionProtocol {
 
     init(executableURL: URL, timeout: TimeInterval = 5) throws {
         self.timeout = timeout
+        inputWriter = try CodexAppServerInputWriter(
+            fileHandle: inputPipe.fileHandleForWriting
+        )
         process.executableURL = executableURL
         process.arguments = ["app-server"]
         process.standardInput = inputPipe
@@ -308,7 +313,7 @@ final class CodexAppServerSession: CodexAppServerSessionProtocol {
         isClosed = true
         outputPipe.fileHandleForReading.readabilityHandler = nil
         errorPipe.fileHandleForReading.readabilityHandler = nil
-        try? inputPipe.fileHandleForWriting.close()
+        inputWriter.close()
         if process.isRunning {
             process.terminate()
         }
@@ -324,7 +329,70 @@ final class CodexAppServerSession: CodexAppServerSessionProtocol {
         }
         var data = try JSONSerialization.data(withJSONObject: object)
         data.append(0x0A)
-        try inputPipe.fileHandleForWriting.write(contentsOf: data)
+        try inputWriter.write(data)
+    }
+}
+
+/// Serializes app-server stdin writes with close and avoids Foundation's
+/// `FileHandle.write` crash when the child process has already closed its end
+/// of the pipe. `F_SETNOSIGPIPE` converts that lifecycle boundary into EPIPE,
+/// which the existing reconnect and fail-closed paths can handle normally.
+final class CodexAppServerInputWriter: @unchecked Sendable {
+    enum Error: Swift.Error {
+        case closed
+    }
+
+    private let fileHandle: FileHandle
+    private let descriptor: Int32
+    private let lock = NSLock()
+    private var isClosed = false
+
+    init(fileHandle: FileHandle) throws {
+        self.fileHandle = fileHandle
+        descriptor = fileHandle.fileDescriptor
+        guard fcntl(descriptor, F_SETNOSIGPIPE, 1) != -1 else {
+            throw Self.posixError()
+        }
+    }
+
+    func write(_ data: Data) throws {
+        try lock.withLock {
+            guard !isClosed else { throw Error.closed }
+            try data.withUnsafeBytes { bytes in
+                guard let baseAddress = bytes.baseAddress else { return }
+                var written = 0
+                while written < bytes.count {
+                    let result = Darwin.write(
+                        descriptor,
+                        baseAddress.advanced(by: written),
+                        bytes.count - written
+                    )
+                    if result > 0 {
+                        written += result
+                    } else if result == -1, errno == EINTR {
+                        continue
+                    } else {
+                        throw Self.posixError()
+                    }
+                }
+            }
+        }
+    }
+
+    func close() {
+        lock.withLock {
+            guard !isClosed else { return }
+            isClosed = true
+            try? fileHandle.close()
+        }
+    }
+
+    deinit {
+        close()
+    }
+
+    private static func posixError() -> POSIXError {
+        POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
     }
 }
 
