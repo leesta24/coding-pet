@@ -25,7 +25,6 @@ enum SessionPanelLayout {
 
 struct SessionPanelView: View {
     @EnvironmentObject private var store: SessionStore
-    @Environment(\.colorScheme) private var colorScheme
 
     let onSelect: (AgentSession) -> Void
     let onOpenSettings: () -> Void
@@ -45,16 +44,9 @@ struct SessionPanelView: View {
         let size = SessionPanelLayout.size(sessionCount: sortedSessions.count)
 
         VStack(spacing: 6) {
-            HStack(spacing: 12) {
-                if let usageSnapshot {
-                    CodexUsageSummaryView(snapshot: usageSnapshot)
-                        .transition(.opacity)
-                }
-                Spacer()
-                settingsButton
-            }
-            .frame(height: 30)
-            .animation(.easeOut(duration: 0.18), value: usageSnapshot)
+            header
+                .frame(height: 26)
+                .animation(.easeOut(duration: 0.18), value: usageSnapshot)
 
             if sortedSessions.isEmpty {
                 emptyState
@@ -62,23 +54,50 @@ struct SessionPanelView: View {
                 sessionList
             }
         }
-        .padding(10)
+        .padding(12)
         .frame(width: 380, height: size.height - 24)
-        .background(panelBackground)
-        .overlay(panelBorder)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: .black.opacity(0.16), radius: 14, y: 7)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.panelRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.panelRadius, style: .continuous)
+                .strokeBorder(Theme.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
         .padding(12)
         .frame(width: size.width, height: size.height)
     }
 
+    private var header: some View {
+        HStack(spacing: 6) {
+            Text("Sessions")
+                .font(.system(size: 14, weight: .semibold))
+                .fixedSize()
+                .padding(.leading, 2)
+
+            if !sortedSessions.isEmpty {
+                TagPill(
+                    text: "\(sortedSessions.count) active",
+                    monospaced: true
+                )
+                .accessibilityLabel("\(sortedSessions.count) active sessions")
+            }
+
+            Spacer()
+
+            if let usageSnapshot {
+                CodexUsageSummaryView(snapshot: usageSnapshot)
+                    .transition(.opacity)
+            }
+
+            settingsButton
+        }
+    }
+
     private var settingsButton: some View {
         Button(action: onOpenSettings) {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 11, weight: .semibold))
+            Image(systemName: "gearshape")
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .background(.primary.opacity(0.045), in: Circle())
+                .frame(width: 26, height: 26)
         }
         .buttonStyle(PanelIconButtonStyle())
         .help("Open CodingPet Settings")
@@ -102,67 +121,31 @@ struct SessionPanelView: View {
                     )
 
                     if index < sortedSessions.count - 1 {
-                        Divider()
-                            .opacity(0.42)
-                            .padding(.leading, 44)
+                        DashedDivider()
+                            .padding(.horizontal, 14)
                     }
                 }
             }
         }
         .scrollIndicators(.never)
         .frame(height: SessionPanelLayout.listHeight(sessionCount: sortedSessions.count))
-        .background(.primary.opacity(colorScheme == .dark ? 0.045 : 0.022))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(.primary.opacity(0.055), lineWidth: 1)
-        )
+        .themeCard()
     }
 
     private var emptyState: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 6) {
             Image(systemName: "terminal")
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 16, weight: .regular))
                 .foregroundStyle(.tertiary)
             Text("No active sessions")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
             Text("Start Codex or Claude Code in a terminal.")
-                .font(.system(size: 11))
+                .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .themeCard()
         .accessibilityElement(children: .combine)
-    }
-
-    private var panelBackground: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(
-                    colorScheme == .dark
-                        ? Color(red: 0.045, green: 0.052, blue: 0.068).opacity(0.88)
-                        : Color.white.opacity(0.84)
-                )
-            LinearGradient(
-                colors: [
-                    store.botState.petAccent.opacity(0.045),
-                    .clear
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-    }
-
-    private var panelBorder: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .strokeBorder(
-                colorScheme == .dark
-                    ? Color.white.opacity(0.10)
-                    : Color.white.opacity(0.70),
-                lineWidth: 1
-            )
     }
 
     private var sortedSessions: [AgentSession] {
@@ -194,9 +177,8 @@ private struct CodexUsageSummaryView: View {
 
             ForEach(Array(snapshot.windows.prefix(2).enumerated()), id: \.offset) { index, window in
                 if index > 0 {
-                    Circle()
-                        .fill(.tertiary.opacity(0.42))
-                        .frame(width: 2.5, height: 2.5)
+                    Text("·")
+                        .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
                 }
 
@@ -207,14 +189,14 @@ private struct CodexUsageSummaryView: View {
                     .monospacedDigit()
             }
         }
-        .font(.system(size: 10.5, weight: .medium))
+        .font(.system(size: 11, weight: .medium))
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
 
     private func valueColor(for remainingPercent: Int) -> Color {
-        remainingPercent <= 20 ? .orange : .primary.opacity(0.72)
+        remainingPercent <= 20 ? Theme.warning : .primary.opacity(0.72)
     }
 
     private var accessibilityLabel: String {
@@ -229,28 +211,28 @@ private struct PanelIconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
-                Color.primary.opacity(configuration.isPressed ? 0.07 : 0),
-                in: Circle()
+                Color.primary.opacity(configuration.isPressed ? 0.08 : 0),
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
             )
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
 private struct SessionRow: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     let session: AgentSession
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 10) {
-            statusMark
+        HStack(spacing: 12) {
+            Image(systemName: session.status.symbolName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(session.status.tint)
+                .frame(width: 20)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 7) {
+                HStack(spacing: 6) {
                     Text(session.displayName)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
@@ -264,29 +246,26 @@ private struct SessionRow: View {
                     Text(session.elapsedReferenceDate, style: .relative)
                         .monospacedDigit()
                 }
-                .font(.system(size: 10.5, weight: .regular))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 8)
 
-            Text(session.status.displayName)
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundStyle(statusColor)
+            StatusPill(status: session.status)
 
             Image(
                 systemName: SessionNavigator.supportsDirectActivation(session)
-                    ? "arrow.up.forward"
+                    ? "arrow.up.right"
                     : "info.circle"
             )
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .opacity(isHovered ? 0.90 : 0.34)
-                .offset(x: isHovered ? 1.5 : 0, y: isHovered ? -1.5 : 0)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(.secondary)
+            .opacity(isHovered ? 0.9 : 0.35)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .frame(height: SessionPanelLayout.rowHeight)
-        .background(rowBackground)
+        .background(Color.primary.opacity(isHovered ? 0.035 : 0))
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .animation(.easeOut(duration: 0.14), value: isHovered)
@@ -295,55 +274,5 @@ private struct SessionRow: View {
             "\(session.displayName), \(session.provider.displayName), " +
             "\(session.status.displayName), \(session.summary)"
         )
-    }
-
-    private var statusMark: some View {
-        ZStack {
-            Circle()
-                .fill(statusColor.opacity(0.10))
-            Circle()
-                .stroke(statusColor.opacity(0.22), lineWidth: 1)
-            Image(systemName: session.status.compactSymbolName)
-                .font(.system(size: 7.5, weight: .bold))
-                .foregroundStyle(statusColor)
-        }
-        .frame(width: 22, height: 22)
-    }
-
-    private var statusColor: Color {
-        switch session.status {
-        case .running: BotState.running.petAccent
-        case .needsInput: BotState.needsInput.petAccent
-        case .ready: BotState.ready.petAccent
-        case .blocked: BotState.blocked.petAccent
-        }
-    }
-
-    private var rowBackground: some View {
-        ZStack {
-            session.provider.visualTint
-                .opacity(colorScheme == .dark ? 0.065 : 0.042)
-            Color.primary.opacity(isHovered ? 0.045 : 0)
-        }
-    }
-}
-
-private extension SessionStatus {
-    var displayName: String {
-        switch self {
-        case .running: "Working"
-        case .needsInput: "Input"
-        case .ready: "Ready"
-        case .blocked: "Blocked"
-        }
-    }
-
-    var compactSymbolName: String {
-        switch self {
-        case .running: "bolt.fill"
-        case .needsInput: "exclamationmark"
-        case .ready: "checkmark"
-        case .blocked: "xmark"
-        }
     }
 }

@@ -91,7 +91,7 @@ struct PetAppearanceRenderingTests {
             .environmentObject(integrationStore)
             .environment(\.colorScheme, .light)
 
-        let pngData = try renderPNG(preview)
+        let pngData = try renderHostedPNG(preview, size: NSSize(width: 760, height: 700))
         #expect(pngData.count > 10_000)
 
         if let outputPath = ProcessInfo.processInfo.environment["CODINGPET_SETTINGS_PREVIEW_PATH"] {
@@ -361,7 +361,7 @@ struct PetAppearanceRenderingTests {
             .background(Color(nsColor: .windowBackgroundColor))
             .environment(\.colorScheme, .light)
 
-        let pngData = try renderPNG(preview)
+        let pngData = try renderHostedPNG(preview, size: NSSize(width: 582, height: 700))
         #expect(pngData.count > 10_000)
 
         if let outputPath = ProcessInfo.processInfo.environment["CODINGPET_BUBBLE_SETTINGS_PREVIEW_PATH"] {
@@ -457,6 +457,14 @@ struct PetAppearanceRenderingTests {
     ) throws -> Data {
         let hostingView = NSHostingView(rootView: content)
         hostingView.frame = NSRect(origin: .zero, size: size)
+        // AppKit-backed controls (switches, sliders) only draw inside a window.
+        let window = NSWindow(
+            contentRect: NSRect(origin: .zero, size: size),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hostingView
         hostingView.layoutSubtreeIfNeeded()
         hostingView.displayIfNeeded()
         let bitmap = try #require(

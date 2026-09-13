@@ -104,20 +104,18 @@ final class SessionNavigationNoticeController {
 }
 
 struct SessionNavigationNoticeView: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "info.circle.fill")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color(red: 0.88, green: 0.53, blue: 0.10))
+            Image(systemName: "info.circle")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.warning)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Can’t open Claude session directly")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.primary)
                 Text("Open this session from Claude Desktop.")
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
 
@@ -127,20 +125,17 @@ struct SessionNavigationNoticeView: View {
         .frame(width: 278, height: 54)
         .background {
             ZStack {
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .fill(
-                        Color(red: 0.96, green: 0.73, blue: 0.35)
-                            .opacity(colorScheme == .dark ? 0.10 : 0.075)
-                    )
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Theme.card.opacity(0.92))
             }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .strokeBorder(.white.opacity(colorScheme == .dark ? 0.10 : 0.65))
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Theme.border, lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
+        .shadow(color: .black.opacity(0.12), radius: 10, y: 5)
         .padding(4)
         .frame(width: 286, height: 62)
         .accessibilityElement(children: .combine)

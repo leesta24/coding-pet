@@ -16,11 +16,13 @@ struct SettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar
-            Divider()
+            Rectangle()
+                .fill(Theme.border)
+                .frame(width: 1)
             detail
         }
         .frame(width: 760, height: 700)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Theme.surface)
     }
 
     private var sidebar: some View {
@@ -29,39 +31,40 @@ struct SettingsView: View {
                 PetAvatarView(
                     appearance: appearanceStore.selection,
                     state: sessionStore.botState,
-                    size: 38,
+                    size: 36,
                     animationsEnabled: appearanceStore.animationsEnabled
                 )
                 VStack(alignment: .leading, spacing: 1) {
                     Text("CodingPet")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(.system(size: 14, weight: .semibold))
                     Text("Settings")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
             }
+            .padding(.leading, 4)
 
-            VStack(spacing: 6) {
+            VStack(spacing: 2) {
                 ForEach(SettingsDestination.allCases) { destination in
                     Button {
                         selection = destination
                     } label: {
-                        HStack(spacing: 10) {
+                        HStack(spacing: 9) {
                             Image(systemName: destination.symbolName)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundStyle(selection == destination ? .primary : .secondary)
                                 .frame(width: 18)
                             Text(destination.title)
-                                .font(.system(size: 12.5, weight: .semibold))
+                                .font(.system(size: 13, weight: .medium))
+                                .fixedSize(horizontal: true, vertical: false)
                             Spacer()
                         }
                         .padding(.horizontal, 10)
-                        .frame(height: 34)
-                        .foregroundStyle(selection == destination ? .primary : .secondary)
+                        .frame(height: 30)
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .background(
-                            selection == destination
-                                ? sessionStore.botState.petAccent.opacity(0.15)
-                                : .clear,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            selection == destination ? Color.primary.opacity(0.07) : .clear,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                         )
                     }
                     .buttonStyle(.plain)
@@ -72,40 +75,25 @@ struct SettingsView: View {
             Spacer()
 
             Button(role: .destructive, action: onQuit) {
-                HStack(spacing: 9) {
+                HStack(spacing: 8) {
                     Image(systemName: "power")
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .frame(width: 18)
                     Text("Quit")
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .lineLimit(1)
                     Spacer()
                 }
-                .padding(.horizontal, 10)
-                .frame(height: 32)
-                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .background(
-                Color.primary.opacity(0.035),
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.primary.opacity(0.07), lineWidth: 1)
-            )
+            .buttonStyle(PillButtonStyle())
             .keyboardShortcut("q", modifiers: .command)
             .help("Quit CodingPet")
 
             Text("Local-first companion")
-                .font(.system(size: 10.5, weight: .medium))
+                .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
+                .padding(.leading, 4)
         }
-        .padding(18)
-        .frame(width: 178)
+        .padding(16)
+        .frame(width: 200)
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.primary.opacity(0.028))
     }
 
     @ViewBuilder
@@ -142,10 +130,10 @@ private enum SettingsDestination: String, CaseIterable, Identifiable {
 
     var symbolName: String {
         switch self {
-        case .appearance: "paintpalette.fill"
-        case .bubbles: "ellipsis.bubble.fill"
-        case .integrations: "point.3.connected.trianglepath.dotted"
-        case .about: "hand.raised.fill"
+        case .appearance: "paintpalette"
+        case .bubbles: "bubble.left"
+        case .integrations: "link"
+        case .about: "hand.raised"
         }
     }
 }
@@ -158,45 +146,48 @@ struct SessionBubbleSettingsView: View {
             title: "Session Bubbles",
             subtitle: "Choose which live session updates appear beside your pet."
         ) {
-            VStack(alignment: .leading, spacing: 10) {
-                SettingsSectionLabel("CONVERSATION BUBBLES")
-
-                bubbleToggle(
-                    title: "Running sessions",
-                    detail: "Show working sessions as conversation bubbles. When off, running sessions stay hidden.",
-                    symbolName: "bolt.fill",
-                    tint: Color(red: 0.17, green: 0.57, blue: 0.95),
-                    isOn: $bubbleSettingsStore.runningBubblesEnabled
-                )
-
-                bubbleToggle(
-                    title: "Pending input",
-                    detail: "Show sessions explicitly waiting for you. When off, they collapse into the compact count.",
-                    symbolName: "exclamationmark.bubble.fill",
-                    tint: Color(red: 0.94, green: 0.25, blue: 0.29),
-                    isOn: $bubbleSettingsStore.pendingBubblesEnabled
-                )
-
-                bubbleToggle(
-                    title: "Ready sessions",
-                    detail: "Show completed sessions with unread activity. When off, they collapse into the compact count.",
-                    symbolName: "checkmark.circle.fill",
-                    tint: Color(red: 0.18, green: 0.76, blue: 0.49),
-                    isOn: $bubbleSettingsStore.readyBubblesEnabled
-                )
+            SettingsSection("Conversation bubbles") {
+                SettingsGroup {
+                    bubbleToggle(
+                        title: "Running sessions",
+                        detail: "Show working sessions as conversation bubbles. When off, running sessions stay hidden.",
+                        status: .running,
+                        isOn: $bubbleSettingsStore.runningBubblesEnabled
+                    )
+                    DashedDivider()
+                    bubbleToggle(
+                        title: "Pending input",
+                        detail: "Show sessions explicitly waiting for you. When off, they collapse into the compact count.",
+                        status: .needsInput,
+                        isOn: $bubbleSettingsStore.pendingBubblesEnabled
+                    )
+                    DashedDivider()
+                    bubbleToggle(
+                        title: "Ready sessions",
+                        detail: "Show completed sessions with unread activity. When off, they collapse into the compact count.",
+                        status: .ready,
+                        isOn: $bubbleSettingsStore.readyBubblesEnabled
+                    )
+                }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                SettingsSectionLabel("HOW IT WORKS")
-
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Pending input, Ready, then Running determines bubble order.", systemImage: "arrow.up.to.line")
-                    Label("At most two full bubbles appear at once.", systemImage: "rectangle.stack.fill")
-                    Label("Bubbles use local session metadata, never transcript text.", systemImage: "lock.shield.fill")
+            SettingsSection("How it works") {
+                SettingsGroup {
+                    SettingsRow(
+                        symbol: "arrow.up.to.line",
+                        title: "Pending input, Ready, then Running determines bubble order."
+                    )
+                    DashedDivider()
+                    SettingsRow(
+                        symbol: "rectangle.stack",
+                        title: "At most two full bubbles appear at once."
+                    )
+                    DashedDivider()
+                    SettingsRow(
+                        symbol: "lock.shield",
+                        title: "Bubbles use local session metadata, never transcript text."
+                    )
                 }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-                .settingsCard()
             }
         }
     }
@@ -204,33 +195,20 @@ struct SessionBubbleSettingsView: View {
     private func bubbleToggle(
         title: String,
         detail: String,
-        symbolName: String,
-        tint: Color,
+        status: SessionStatus,
         isOn: Binding<Bool>
     ) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: symbolName)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 40, height: 40)
-                .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 13.5, weight: .semibold))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 16)
-
-            Toggle("", isOn: isOn)
+        SettingsRow(
+            symbol: status.symbolName,
+            symbolTint: status.tint,
+            title: title,
+            detail: detail
+        ) {
+            Toggle(title, isOn: isOn)
                 .labelsHidden()
-                .toggleStyle(CodingPetSwitchStyle(tint: tint))
+                .toggleStyle(.switch)
+                .tint(Theme.accent)
         }
-        .settingsCard()
     }
 }
 
@@ -239,8 +217,8 @@ private struct AppearanceSettingsView: View {
     @EnvironmentObject private var appearanceStore: PetAppearanceStore
 
     private let columns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
 
     var body: some View {
@@ -248,92 +226,48 @@ private struct AppearanceSettingsView: View {
             title: "Appearance",
             subtitle: "Choose the companion that stays with your coding sessions."
         ) {
-            VStack(alignment: .leading, spacing: 10) {
-                SettingsSectionLabel("PET LIBRARY")
-                LazyVGrid(columns: columns, spacing: 14) {
+            SettingsSection("Pet library") {
+                LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(appearanceStore.availableAppearances) { appearance in
                         appearanceCard(appearance)
                     }
                 }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                SettingsSectionLabel("DISPLAY")
-                VStack(spacing: 14) {
-                    HStack(alignment: .top, spacing: 14) {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(sessionStore.botState.petAccent)
-                            .frame(width: 36, height: 36)
-                            .background(
-                                sessionStore.botState.petAccent.opacity(0.12),
-                                in: RoundedRectangle(cornerRadius: 10)
+            SettingsSection("Display") {
+                SettingsGroup {
+                    SettingsRow(
+                        symbol: "arrow.up.left.and.arrow.down.right",
+                        title: "Bot size",
+                        detail: "Adjust how large the pet appears on screen."
+                    ) {
+                        HStack(spacing: 12) {
+                            Slider(
+                                value: botSizeBinding,
+                                in: PetAppearanceStore.botSizeRange
                             )
-                            .padding(.top, 1)
+                            .tint(Theme.accent)
+                            .frame(width: 170)
+                            .accessibilityLabel("Bot size")
+                            .accessibilityValue("\(Int(appearanceStore.botSize)) points")
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Bot size")
-                                    .font(.system(size: 13, weight: .semibold))
-                                Spacer()
-                                Text("\(Int(appearanceStore.botSize)) pt")
-                                    .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                                    .foregroundStyle(sessionStore.botState.petAccent)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        sessionStore.botState.petAccent.opacity(0.10),
-                                        in: Capsule()
-                                    )
-                            }
-
-                            VStack(spacing: 2) {
-                                BotSizeSlider(
-                                    value: botSizeBinding,
-                                    range: PetAppearanceStore.botSizeRange,
-                                    step: 4,
-                                    tint: sessionStore.botState.petAccent
-                                )
-
-                                HStack {
-                                    Text("\(Int(PetAppearanceStore.botSizeRange.lowerBound)) pt")
-                                    Spacer()
-                                    Text("\(Int(PetAppearanceStore.botSizeRange.upperBound)) pt")
-                                }
-                                .font(.system(size: 9, weight: .medium, design: .rounded))
-                                .foregroundStyle(.tertiary)
-                            }
+                            TagPill(text: "\(Int(appearanceStore.botSize)) pt", monospaced: true)
+                                .frame(width: 52, alignment: .trailing)
+                                .accessibilityHidden(true)
                         }
                     }
-
-                    Divider()
-
-                    HStack(spacing: 14) {
-                        Image(systemName: "waveform.path")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(sessionStore.botState.petAccent)
-                            .frame(width: 36, height: 36)
-                            .background(
-                                sessionStore.botState.petAccent.opacity(0.12),
-                                in: RoundedRectangle(cornerRadius: 10)
-                            )
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Status animations")
-                                .font(.system(size: 13, weight: .semibold))
-                            Text("Animate activity; macOS Reduce Motion still takes priority.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Toggle("", isOn: $appearanceStore.animationsEnabled)
+                    DashedDivider()
+                    SettingsRow(
+                        symbol: "waveform.path",
+                        title: "Status animations",
+                        detail: "Animate activity; macOS Reduce Motion still takes priority."
+                    ) {
+                        Toggle("Status animations", isOn: $appearanceStore.animationsEnabled)
                             .labelsHidden()
-                            .toggleStyle(CodingPetSwitchStyle(tint: sessionStore.botState.petAccent))
+                            .toggleStyle(.switch)
+                            .tint(Theme.accent)
                     }
                 }
-                .settingsCard()
             }
         }
     }
@@ -341,7 +275,7 @@ private struct AppearanceSettingsView: View {
     private var botSizeBinding: Binding<Double> {
         Binding(
             get: { appearanceStore.botSize },
-            set: { appearanceStore.setBotSize($0) }
+            set: { appearanceStore.setBotSize(($0 / 4).rounded() * 4) }
         )
     }
 
@@ -350,64 +284,39 @@ private struct AppearanceSettingsView: View {
         return Button {
             appearanceStore.selection = appearance
         } label: {
-            VStack(spacing: 0) {
-                ZStack(alignment: .topTrailing) {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(
-                            isSelected
-                                ? sessionStore.botState.petAccent.opacity(0.10)
-                                : Color.primary.opacity(0.028)
-                        )
-
-                    PetAvatarView(
-                        appearance: appearance,
-                        state: sessionStore.botState,
-                        size: 126,
-                        animationsEnabled: appearanceStore.animationsEnabled
-                    )
-                    .padding(.vertical, 12)
-
-                    if isSelected {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .black))
-                            .foregroundStyle(.white)
-                            .frame(width: 22, height: 22)
-                            .background(sessionStore.botState.petAccent, in: Circle())
-                            .padding(10)
-                            .accessibilityHidden(true)
-                    }
-                }
+            VStack(spacing: 10) {
+                PetAvatarView(
+                    appearance: appearance,
+                    state: sessionStore.botState,
+                    size: 120,
+                    animationsEnabled: appearanceStore.animationsEnabled
+                )
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
 
                 HStack(spacing: 8) {
                     Text(appearance.displayName)
-                        .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                        .font(.system(size: 13, weight: .medium))
                     Spacer()
-                    Text(isSelected ? "Current" : "")
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(sessionStore.botState.petAccent)
-                        .accessibilityHidden(true)
+                    if isSelected {
+                        TagPill(text: "Current", tint: Theme.accent)
+                            .accessibilityHidden(true)
+                    }
                 }
-                .padding(.horizontal, 4)
-                .padding(.top, 10)
+                .padding(.horizontal, 2)
             }
-            .padding(9)
+            .padding(10)
             .frame(maxWidth: .infinity)
-            .background(
-                isSelected
-                    ? sessionStore.botState.petAccent.opacity(0.075)
-                    : Color.primary.opacity(0.018),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(
-                        isSelected
-                            ? sessionStore.botState.petAccent.opacity(0.78)
-                            : Color.primary.opacity(0.09),
-                        lineWidth: isSelected ? 2 : 1
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? Theme.accent : Theme.border,
+                        lineWidth: isSelected ? 1.5 : 1
                     )
             )
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Use \(appearance.accessibilityName)")
@@ -417,7 +326,6 @@ private struct AppearanceSettingsView: View {
 }
 
 struct IntegrationSettingsView: View {
-    @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var integrationStore: IntegrationSettingsStore
 
     var body: some View {
@@ -425,92 +333,75 @@ struct IntegrationSettingsView: View {
             title: "Integrations",
             subtitle: "Connect supported CLIs with local, non-blocking lifecycle hooks."
         ) {
-            VStack(spacing: 10) {
-                providerCard(
+            SettingsGroup {
+                providerRow(
                     provider: .codex,
                     title: "Codex CLI",
                     detail: "~/.codex/hooks.json",
                     symbolName: "chevron.left.forwardslash.chevron.right"
                 )
-                providerCard(
+                DashedDivider()
+                providerRow(
                     provider: .claudeCode,
                     title: "Claude Code",
                     detail: "~/.claude/settings.json",
-                    symbolName: "terminal.fill"
+                    symbolName: "terminal"
                 )
             }
 
             if let feedback = integrationStore.feedback {
+                let tint = feedback.kind == .success ? Theme.accent : Theme.danger
                 Label(
                     feedback.message,
                     systemImage: feedback.kind == .success
-                        ? "checkmark.circle.fill"
-                        : "exclamationmark.triangle.fill"
+                        ? "checkmark.circle"
+                        : "exclamationmark.triangle"
                 )
-                .font(.caption)
-                .foregroundStyle(feedback.kind == .success ? .green : .red)
-                .padding(12)
+                .font(.system(size: 12))
+                .foregroundStyle(tint)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    (feedback.kind == .success ? Color.green : Color.red).opacity(0.09),
-                    in: RoundedRectangle(cornerRadius: 12)
-                )
+                .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
             }
 
-            HStack {
-                Button {
-                    integrationStore.refresh()
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
+            Button {
+                integrationStore.refresh()
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(PillButtonStyle())
 
             Label(
                 "Codex installation records exact local hook hashes as trusted. Claude Code installs independently. CodingPet never approves or modifies a tool request.",
-                systemImage: "lock.shield.fill"
+                systemImage: "lock.shield"
             )
-            .font(.caption)
+            .font(.system(size: 11.5))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
         .onAppear { integrationStore.refresh() }
     }
 
-    private func providerCard(
+    private func providerRow(
         provider: HookConfigurationProvider,
         title: String,
         detail: String,
         symbolName: String
     ) -> some View {
         let status = integrationStore.statuses[provider] ?? .notInstalled
-        return HStack(spacing: 14) {
-            Image(systemName: symbolName)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(status.color)
-                .frame(width: 40, height: 40)
-                .background(status.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 13.5, weight: .semibold))
-                Text(detail)
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundStyle(.secondary)
+        return SettingsRow(
+            symbol: symbolName,
+            symbolTint: status.color,
+            title: title,
+            detail: detail,
+            monospacedDetail: true
+        ) {
+            HStack(spacing: 10) {
+                TagPill(text: status.title, tint: status.color)
+                providerAction(provider: provider, title: title, status: status)
             }
-
-            Spacer()
-
-            Label(status.title, systemImage: status.symbolName)
-                .font(.system(size: 10.5, weight: .bold))
-                .foregroundStyle(status.color)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(status.color.opacity(0.10), in: Capsule())
-
-            providerAction(provider: provider, title: title, status: status)
         }
-        .settingsCard()
     }
 
     @ViewBuilder
@@ -524,22 +415,21 @@ struct IntegrationSettingsView: View {
             Button("Uninstall", role: .destructive) {
                 integrationStore.uninstall(provider)
             }
+            .buttonStyle(PillButtonStyle())
             .accessibilityLabel("Uninstall \(title) hooks")
 
         case .needsRepair:
             Button("Repair") {
                 integrationStore.installOrRepair(provider)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            .buttonStyle(PillButtonStyle(prominence: .primary))
             .accessibilityLabel("Repair \(title) hooks")
 
         case .notInstalled:
             Button("Install") {
                 integrationStore.installOrRepair(provider)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(sessionStore.botState.petAccent)
+            .buttonStyle(PillButtonStyle(prominence: .primary))
             .accessibilityLabel("Install \(title) hooks")
         }
     }
@@ -554,38 +444,40 @@ private struct AboutSettingsView: View {
             title: "About & Privacy",
             subtitle: "A local companion for Codex CLI and Claude Code sessions."
         ) {
-            HStack(spacing: 18) {
+            HStack(spacing: 16) {
                 PetAvatarView(
                     appearance: appearanceStore.selection,
                     state: sessionStore.botState,
-                    size: 88,
+                    size: 80,
                     animationsEnabled: appearanceStore.animationsEnabled
                 )
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("CodingPet")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.system(size: 18, weight: .semibold))
                     Text(appVersion)
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    Text("macOS 14+ • Apple silicon")
-                        .font(.caption)
+                    Text("macOS 14+ · Apple silicon")
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
             }
 
-            VStack(spacing: 10) {
-                privacyRow(
-                    symbol: "internaldrive.fill",
+            SettingsGroup {
+                SettingsRow(
+                    symbol: "internaldrive",
                     title: "Local-only data",
                     detail: "Session metadata and preferences stay on this Mac."
                 )
-                privacyRow(
-                    symbol: "eye.slash.fill",
+                DashedDivider()
+                SettingsRow(
+                    symbol: "eye.slash",
                     title: "No account or telemetry",
                     detail: "CodingPet does not upload prompts, code, diffs, or tool output."
                 )
-                privacyRow(
-                    symbol: "terminal.fill",
+                DashedDivider()
+                SettingsRow(
+                    symbol: "terminal",
                     title: "The CLI stays in control",
                     detail: "Approvals and replies always remain in the originating terminal."
                 )
@@ -599,28 +491,6 @@ private struct AboutSettingsView: View {
         }
         return "Development build"
     }
-
-    private func privacyRow(symbol: String, title: String, detail: String) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(sessionStore.botState.petAccent)
-                .frame(width: 38, height: 38)
-                .background(
-                    sessionStore.botState.petAccent.opacity(0.11),
-                    in: RoundedRectangle(cornerRadius: 10)
-                )
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .settingsCard()
-    }
 }
 
 private struct SettingsPage<Content: View>: View {
@@ -629,12 +499,12 @@ private struct SettingsPage<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .font(.system(size: 20, weight: .semibold))
                 Text(subtitle)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.system(size: 12.5))
                     .foregroundStyle(.secondary)
             }
             content
@@ -645,145 +515,87 @@ private struct SettingsPage<Content: View>: View {
     }
 }
 
-private struct SettingsSectionLabel: View {
+private struct SettingsSection<Content: View>: View {
     let title: String
+    @ViewBuilder let content: Content
 
-    init(_ title: String) {
+    init(_ title: String, @ViewBuilder content: () -> Content) {
         self.title = title
+        self.content = content()
     }
 
     var body: some View {
-        Text(title)
-            .font(.system(size: 9.5, weight: .bold, design: .rounded))
-            .tracking(1.05)
-            .foregroundStyle(.secondary)
-    }
-}
-
-private extension View {
-    func settingsCard() -> some View {
-        self
-            .padding(14)
-            .background(
-                Color.primary.opacity(0.035),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.primary.opacity(0.075), lineWidth: 1)
-            )
-    }
-}
-
-private struct CodingPetSwitchStyle: ToggleStyle {
-    let tint: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        ZStack(alignment: configuration.isOn ? .trailing : .leading) {
-            Capsule()
-                .fill(configuration.isOn ? tint : Color.primary.opacity(0.14))
-                .frame(width: 38, height: 22)
-
-            Circle()
-                .fill(.white)
-                .frame(width: 18, height: 18)
-                .padding(2)
-                .shadow(color: .black.opacity(0.16), radius: 1.5, y: 1)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 2)
+            content
         }
-        .contentShape(Capsule())
-        .onTapGesture {
-            configuration.isOn.toggle()
-        }
-        .animation(
-            .spring(response: 0.22, dampingFraction: 0.82),
-            value: configuration.isOn
-        )
-        .accessibilityValue(configuration.isOn ? "On" : "Off")
     }
 }
 
-private struct BotSizeSlider: View {
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let step: Double
-    let tint: Color
-    private let thumbSize: CGFloat = 16
+/// White card holding rows separated by `DashedDivider`.
+private struct SettingsGroup<Content: View>: View {
+    @ViewBuilder let content: Content
 
-    private var progress: CGFloat {
-        CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
+    var body: some View {
+        VStack(spacing: 0) {
+            content
+        }
+        .padding(.horizontal, 14)
+        .themeCard()
+    }
+}
+
+private struct SettingsRow<Trailing: View>: View {
+    let symbol: String
+    var symbolTint: Color = .secondary
+    let title: String
+    var detail: String? = nil
+    var monospacedDetail = false
+    @ViewBuilder let trailing: Trailing
+
+    init(
+        symbol: String,
+        symbolTint: Color = .secondary,
+        title: String,
+        detail: String? = nil,
+        monospacedDetail: Bool = false,
+        @ViewBuilder trailing: () -> Trailing = { EmptyView() }
+    ) {
+        self.symbol = symbol
+        self.symbolTint = symbolTint
+        self.title = title
+        self.detail = detail
+        self.monospacedDetail = monospacedDetail
+        self.trailing = trailing()
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            let travel = max(width - thumbSize, 1)
-            let thumbCenterX = thumbSize / 2 + travel * progress
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(symbolTint)
+                .frame(width: 20)
 
-            ZStack {
-                Canvas { context, size in
-                    let trackY = (size.height - 4) / 2
-                    let trackRect = CGRect(
-                        x: 0,
-                        y: trackY,
-                        width: size.width,
-                        height: 4
-                    )
-                    context.fill(
-                        Path(roundedRect: trackRect, cornerRadius: 2),
-                        with: .color(Color.primary.opacity(0.12))
-                    )
-
-                    let activeRect = CGRect(
-                        x: 0,
-                        y: trackY,
-                        width: thumbCenterX,
-                        height: 4
-                    )
-                    context.fill(
-                        Path(roundedRect: activeRect, cornerRadius: 2),
-                        with: .color(tint)
-                    )
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    Text(detail)
+                        .font(.system(size: 11.5, design: monospacedDetail ? .monospaced : .default))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Circle()
-                    .fill(.background)
-                    .frame(width: thumbSize, height: thumbSize)
-                    .overlay(Circle().stroke(tint, lineWidth: 2.5))
-                    .shadow(color: .black.opacity(0.14), radius: 2, y: 1)
-                    .position(x: thumbCenterX, y: proxy.size.height / 2)
             }
-            .frame(width: width, height: proxy.size.height)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { gesture in
-                        updateValue(at: gesture.location.x, width: width)
-                    }
-            )
-        }
-        .frame(height: 22)
-        .accessibilityElement()
-        .accessibilityLabel("Bot size")
-        .accessibilityValue("\(Int(value)) points")
-        .accessibilityAdjustableAction { direction in
-            switch direction {
-            case .increment:
-                value = min(value + step, range.upperBound)
-            case .decrement:
-                value = max(value - step, range.lowerBound)
-            @unknown default:
-                break
-            }
-        }
-    }
 
-    private func updateValue(at location: CGFloat, width: CGFloat) {
-        let travel = max(width - thumbSize, 1)
-        let normalized = min(max((location - thumbSize / 2) / travel, 0), 1)
-        let rawValue = range.lowerBound
-            + Double(normalized) * (range.upperBound - range.lowerBound)
-        let steps = ((rawValue - range.lowerBound) / step).rounded()
-        value = min(max(range.lowerBound + steps * step, range.lowerBound), range.upperBound)
+            Spacer(minLength: 16)
+
+            trailing
+        }
+        .padding(.vertical, 13)
     }
 }
 
@@ -796,19 +608,11 @@ private extension HookInstallationStatus {
         }
     }
 
-    var symbolName: String {
-        switch self {
-        case .notInstalled: "minus.circle.fill"
-        case .installed: "checkmark.circle.fill"
-        case .needsRepair: "exclamationmark.triangle.fill"
-        }
-    }
-
     var color: Color {
         switch self {
         case .notInstalled: .secondary
-        case .installed: .green
-        case .needsRepair: .orange
+        case .installed: Theme.accent
+        case .needsRepair: Theme.warning
         }
     }
 }
