@@ -83,6 +83,37 @@ struct HookConfigurationInstallerTests {
     }
 
     @Test
+    func uninstallAfterRepairKeepsEditsMadeByOtherToolsInsteadOfRestoringStaleBackup() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let configURL = directory.appending(path: "settings.json")
+        try Data(#"{"theme":"light"}"#.utf8).write(to: configURL)
+        let installer = HookConfigurationInstaller(
+            provider: .claudeCode,
+            configURL: configURL,
+            hookExecutableURL: URL(fileURLWithPath: "/tmp/CodingPetHook")
+        )
+        try installer.install()
+
+        // Another tool rewrites the file: drops our handlers and adds its own settings.
+        try Data(#"{"theme":"dark","otherTool":true,"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/other-tool"}]}]}}"#.utf8)
+            .write(to: configURL)
+        #expect(installer.installationStatus() == .needsRepair)
+
+        try installer.install()
+        #expect(installer.installationStatus() == .installed)
+        try installer.uninstall()
+
+        let uninstalled = try jsonObject(at: configURL)
+        #expect(uninstalled["theme"] as? String == "dark")
+        #expect(uninstalled["otherTool"] as? Bool == true)
+        #expect(existingCommandCount(in: uninstalled, command: "/other-tool") == 1)
+        #expect(codingPetHandlerCount(in: uninstalled) == 0)
+        #expect(!FileManager.default.fileExists(atPath: installer.backupURL.path))
+        #expect(!FileManager.default.fileExists(atPath: installer.metadataURL.path))
+    }
+
+    @Test
     func uninstallPreservesUnrelatedEditsMadeAfterInstall() throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -21,19 +21,34 @@ final class PetAppearanceStore: ObservableObject {
         }
     }
 
+    struct ImportFeedback: Equatable {
+        enum Kind: Equatable {
+            case success
+            case error
+        }
+
+        let kind: Kind
+        let message: String
+    }
+
     @Published private(set) var availableAppearances: [PetAppearance]
     @Published private(set) var botSize: Double
+    @Published private(set) var isImporting = false
+    @Published private(set) var importFeedback: ImportFeedback?
 
     private let defaults: UserDefaults
+    private let localPetsDirectory: URL
+    private let importer: PetPackageImporter
 
     init(
         defaults: UserDefaults = .standard,
-        localPetsDirectory: URL = PetAppearanceStore.defaultLocalPetsDirectory
+        localPetsDirectory: URL = PetAppearanceStore.defaultLocalPetsDirectory,
+        importer: PetPackageImporter? = nil
     ) {
         self.defaults = defaults
-        let localAppearances = PetSpriteAtlas.localAppearances(in: localPetsDirectory)
-            .filter { $0.rawValue != PetAppearance.xiaobao.rawValue }
-        let discoveredAppearances = [PetAppearance.xiaobao] + localAppearances
+        self.localPetsDirectory = localPetsDirectory
+        self.importer = importer ?? PetPackageImporter(petsDirectory: localPetsDirectory)
+        let discoveredAppearances = Self.discoverAppearances(in: localPetsDirectory)
         availableAppearances = discoveredAppearances
         let storedID = defaults.string(forKey: Self.storageKey)
         selection = discoveredAppearances.first { $0.rawValue == storedID } ?? .xiaobao
@@ -50,6 +65,61 @@ final class PetAppearanceStore: ObservableObject {
         guard botSize != clampedSize else { return }
         botSize = clampedSize
         defaults.set(clampedSize, forKey: Self.botSizeStorageKey)
+    }
+
+    /// Rescans the local pet library. Keeps the current selection when its package
+    /// still exists (matched by id, so a replaced package with a new name stays selected).
+    func reloadAvailableAppearances() {
+        availableAppearances = Self.discoverAppearances(in: localPetsDirectory)
+        selection = availableAppearances.first { $0.rawValue == selection.rawValue } ?? .xiaobao
+    }
+
+    /// Downloads a pet from codex-pets.net by ID or page link, adds it to the library,
+    /// and selects it.
+    func importPet(reference: String) async {
+        await runImport { try await importer.importPet(reference: reference) }
+    }
+
+    /// Installs a `.codex-pet.zip` from disk, adds it to the library, and selects it.
+    func importPackage(at archiveURL: URL) async {
+        await runImport { try await importer.importPackage(at: archiveURL) }
+    }
+
+    private func runImport(_ operation: () async throws -> URL) async {
+        guard !isImporting else { return }
+        isImporting = true
+        importFeedback = nil
+        defer { isImporting = false }
+        do {
+            let directory = try await operation()
+            reloadAvailableAppearances()
+            let importedID = directory.lastPathComponent
+            guard let imported = availableAppearances.first(where: { $0.rawValue == importedID }) else {
+                importFeedback = ImportFeedback(
+                    kind: .error,
+                    message: "The pet was saved but could not be loaded."
+                )
+                return
+            }
+            selection = imported
+            importFeedback = ImportFeedback(
+                kind: .success,
+                message: "\(imported.displayName) was added to your pet library."
+            )
+        } catch let error as PetPackageImporter.Error {
+            importFeedback = ImportFeedback(kind: .error, message: error.localizedDescription)
+        } catch {
+            importFeedback = ImportFeedback(
+                kind: .error,
+                message: "Could not import the pet: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private static func discoverAppearances(in localPetsDirectory: URL) -> [PetAppearance] {
+        let localAppearances = PetSpriteAtlas.localAppearances(in: localPetsDirectory)
+            .filter { $0.rawValue != PetAppearance.xiaobao.rawValue }
+        return [PetAppearance.xiaobao] + localAppearances
     }
 
     private static func clampedBotSize(_ size: Double) -> Double {

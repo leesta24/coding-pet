@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @EnvironmentObject private var sessionStore: SessionStore
@@ -215,6 +216,7 @@ struct SessionBubbleSettingsView: View {
 private struct AppearanceSettingsView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var appearanceStore: PetAppearanceStore
+    @State private var importReference = ""
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -232,6 +234,10 @@ private struct AppearanceSettingsView: View {
                         appearanceCard(appearance)
                     }
                 }
+            }
+
+            SettingsSection("Import from codex-pets.net") {
+                importSection
             }
 
             SettingsSection("Display") {
@@ -277,6 +283,89 @@ private struct AppearanceSettingsView: View {
             get: { appearanceStore.botSize },
             set: { appearanceStore.setBotSize(($0 / 4).rounded() * 4) }
         )
+    }
+
+    private var importSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                TextField("Pet link or ID, e.g. codex-pets.net/#/pets/yuumi", text: $importReference)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(appearanceStore.isImporting)
+                    .onSubmit(importFromReference)
+
+                Button(action: importFromReference) {
+                    if appearanceStore.isImporting {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(width: 44)
+                    } else {
+                        Text("Import")
+                            .frame(width: 44)
+                    }
+                }
+                .buttonStyle(PillButtonStyle(prominence: .primary))
+                .disabled(appearanceStore.isImporting || trimmedImportReference.isEmpty)
+                .accessibilityLabel("Import pet from codex-pets.net")
+            }
+
+            HStack {
+                Button("Import .codex-pet.zip…", action: importFromArchive)
+                    .buttonStyle(PillButtonStyle())
+                    .disabled(appearanceStore.isImporting)
+                Spacer()
+                Link("Browse pets", destination: PetPackageImporter.siteBaseURL)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.accent)
+            }
+
+            if let feedback = appearanceStore.importFeedback {
+                let tint = feedback.kind == .success ? Theme.accent : Theme.danger
+                Label(
+                    feedback.message,
+                    systemImage: feedback.kind == .success
+                        ? "checkmark.circle"
+                        : "exclamationmark.triangle"
+                )
+                .font(.system(size: 12))
+                .foregroundStyle(tint)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+
+            Text("Downloads pet.json and spritesheet.webp from codex-pets.net into ~/Library/Application Support/CodingPet/Pets only when you ask. Pets are shared by their creators; check each pet's page for usage rights.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .themeCard()
+    }
+
+    private var trimmedImportReference: String {
+        importReference.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func importFromReference() {
+        let reference = trimmedImportReference
+        guard !reference.isEmpty, !appearanceStore.isImporting else { return }
+        Task {
+            await appearanceStore.importPet(reference: reference)
+            if appearanceStore.importFeedback?.kind == .success {
+                importReference = ""
+            }
+        }
+    }
+
+    private func importFromArchive() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.zip]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Choose a .codex-pet.zip sprite kit"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task { await appearanceStore.importPackage(at: url) }
     }
 
     private func appearanceCard(_ appearance: PetAppearance) -> some View {
@@ -467,7 +556,7 @@ private struct AboutSettingsView: View {
                 SettingsRow(
                     symbol: "internaldrive",
                     title: "Local-only data",
-                    detail: "Session metadata and preferences stay on this Mac."
+                    detail: "Session metadata and preferences stay on this Mac. The only network request is a pet download from codex-pets.net that you start yourself."
                 )
                 DashedDivider()
                 SettingsRow(

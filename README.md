@@ -27,7 +27,8 @@ editor or terminal.
 - **Customize the companion** — choose a pet, resize it, control animations,
   and independently enable Running, Pending input, and Ready bubbles.
 - **Keep everything local** — no account, cloud service, analytics, telemetry,
-  prompt upload, code upload, or remote session storage.
+  prompt upload, code upload, or remote session storage. The only outbound
+  request is a pet download from codex-pets.net that you start yourself.
 
 ## Codex and Claude Code support
 
@@ -59,6 +60,17 @@ CodingPet also discovers private Codex-compatible v2 packages from:
 A valid package uses a transparent `1536x2288` atlas: 8 columns, 11 rows, and
 `192x208` cells. Private packages stay outside this repository and are never
 copied into application or DMG builds.
+
+### Import a pet from codex-pets.net
+
+[codex-pets.net](https://codex-pets.net/) shares community-made v2 pets in the
+same package format. In **Settings → Appearance → Import from codex-pets.net**,
+paste a pet link such as `https://codex-pets.net/#/pets/yuumi` (or just the
+pet ID) and click **Import**. CodingPet downloads the `.codex-pet.zip`,
+validates the manifest and atlas, installs it under the local pet library, and
+selects it. A `.codex-pet.zip` already on disk can be imported with
+**Import .codex-pet.zip…**. Pets are shared by their creators; check each pet's
+page for usage rights.
 
 ### Create a new pet with Codex
 
@@ -94,8 +106,8 @@ Then provide the exact custom pet ID or directory:
 $migrate-codex-custom-pet Migrate my user-created pet from ~/.codex/pets/my-pet.
 ```
 
-Restart CodingPet after adding or removing a local package so the Appearance
-gallery refreshes.
+Restart CodingPet after manually adding or removing a local package so the
+Appearance gallery refreshes; imports through Settings refresh it immediately.
 
 ## Install
 

@@ -115,11 +115,19 @@ struct HookConfigurationInstaller {
             if removingAgentPeekHandlers, existingMetadata.originalExisted {
                 try sanitizeAgentPeekHandlersInBackup()
             }
+            // The digest marks the state in which uninstall may restore the backup
+            // wholesale. If someone else edited the configuration since our last
+            // write, the backup no longer matches "current minus our handlers", so
+            // keep the stale digest: uninstall then falls back to removing only our
+            // handlers instead of overwriting their edits with the old backup.
+            let untouchedSinceInstall = Self.digest(currentData) == existingMetadata.installedDigest
             metadata = InstallationMetadata(
                 version: existingMetadata.version,
                 originalExisted: existingMetadata.originalExisted,
                 originalPermissions: existingMetadata.originalPermissions,
-                installedDigest: Self.digest(installedData)
+                installedDigest: untouchedSinceInstall
+                    ? Self.digest(installedData)
+                    : existingMetadata.installedDigest
             )
         } else {
             let permissions = Self.permissions(at: writableConfigURL)
