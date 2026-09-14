@@ -361,6 +361,8 @@ struct HookConfigurationInstaller {
                     name: "Notification",
                     matcher: "permission_prompt|idle_prompt|elicitation_dialog"
                 ),
+                EventDefinition(name: "SubagentStart"),
+                EventDefinition(name: "SubagentStop"),
                 EventDefinition(name: "Stop"),
                 EventDefinition(name: "StopFailure"),
                 EventDefinition(name: "SessionEnd")

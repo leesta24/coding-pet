@@ -65,6 +65,9 @@ struct AgentSession: Identifiable, Codable, Hashable, Sendable {
     var elapsedReferenceDate: Date {
         status == .running ? turnStartedAt ?? updatedAt : updatedAt
     }
+
+    static let backgroundTaskSummary = "Background task running"
+    static let completedSummary = "Completed — ready to review"
 }
 
 extension Array where Element == AgentSession {

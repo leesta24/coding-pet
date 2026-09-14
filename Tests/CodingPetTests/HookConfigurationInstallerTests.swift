@@ -150,7 +150,7 @@ struct HookConfigurationInstallerTests {
 
         #expect(try Data(contentsOf: installer.backupURL) == original)
         let installed = try jsonObject(at: configURL)
-        #expect(codingPetHandlerCount(in: installed) == 9)
+        #expect(codingPetHandlerCount(in: installed) == 11)
         let notificationGroups = try hookGroups(named: "Notification", in: installed)
         #expect(notificationGroups.count == 1)
         #expect(notificationGroups.first?["matcher"] as? String == "permission_prompt|idle_prompt|elicitation_dialog")
@@ -320,7 +320,7 @@ struct HookConfigurationInstallerTests {
         #expect(coordinator.installationStatuses()[.claudeCode] == .installed)
         #expect(coordinator.installationStatuses()[.codex] == .notInstalled)
         #expect(try Data(contentsOf: codexURL) == invalidCodex)
-        #expect(codingPetHandlerCount(in: try jsonObject(at: claudeURL)) == 9)
+        #expect(codingPetHandlerCount(in: try jsonObject(at: claudeURL)) == 11)
 
         try coordinator.uninstall(.claudeCode)
 

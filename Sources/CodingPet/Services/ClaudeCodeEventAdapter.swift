@@ -19,7 +19,7 @@ struct ClaudeCodeEventAdapter: AgentSessionEventAdapter {
         case "Notification" where needsInputNotificationTypes.contains(event.eventSubtype):
             return NormalizedSessionState(status: .needsInput, summary: "Waiting for input")
         case "Stop":
-            return NormalizedSessionState(status: .ready, summary: "Completed — ready to review")
+            return NormalizedSessionState(status: .ready, summary: AgentSession.completedSummary)
         default:
             return nil
         }

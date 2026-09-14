@@ -26,6 +26,7 @@ final class SessionStore: ObservableObject {
     @Published private(set) var sessions: [AgentSession]
     @Published private(set) var dismissedBubbleVersions: [String: SessionBubbleVersion] = [:]
     private var acknowledgedReadyVersions: [String: Date] = [:]
+    private var activeSubagentCounts: [String: Int] = [:]
 
     init(sessions: [AgentSession] = []) {
         self.sessions = sessions
@@ -115,12 +116,57 @@ final class SessionStore: ObservableObject {
         if event.clearsActiveSession {
             sessions.removeAll { $0.id == id }
             dismissedBubbleVersions.removeValue(forKey: id)
+            activeSubagentCounts.removeValue(forKey: id)
+            return
+        }
+        if event.isSubagentLifecycle {
+            applySubagentLifecycle(event, id: id, existing: existing)
             return
         }
 
-        guard let session = SessionEventRouter.session(for: event, existing: existing) else {
+        guard var session = SessionEventRouter.session(for: event, existing: existing) else {
             return
         }
+        if event.eventName == "Stop", activeSubagentCounts[id, default: 0] > 0 {
+            // The main turn ended but background agents are still working.
+            session.status = .running
+            session.summary = AgentSession.backgroundTaskSummary
+            session.turnStartedAt = existing?.turnStartedAt ?? event.timestamp
+        }
+        upsert(session)
+    }
+
+    /// Counts background subagents per session so a Stop that arrives while
+    /// they run shows "still working" instead of Ready, and the last
+    /// SubagentStop afterwards finishes the turn.
+    private func applySubagentLifecycle(
+        _ event: HookEventEnvelope,
+        id: String,
+        existing: AgentSession?
+    ) {
+        if event.eventName == "SubagentStart" {
+            activeSubagentCounts[id, default: 0] += 1
+            guard var session = existing, session.status == .ready else { return }
+            session.status = .running
+            session.summary = AgentSession.backgroundTaskSummary
+            session.updatedAt = event.timestamp
+            session.turnStartedAt = event.timestamp
+            upsert(session)
+            return
+        }
+
+        let remaining = max(activeSubagentCounts[id, default: 0] - 1, 0)
+        activeSubagentCounts[id] = remaining
+        guard remaining == 0,
+              var session = existing,
+              session.status == .running,
+              session.summary == AgentSession.backgroundTaskSummary else {
+            return
+        }
+        session.status = .ready
+        session.summary = AgentSession.completedSummary
+        session.updatedAt = event.timestamp
+        session.turnStartedAt = nil
         upsert(session)
     }
 

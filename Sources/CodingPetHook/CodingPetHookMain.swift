@@ -37,30 +37,34 @@ enum CodingPetHookMain {
         // Persist the already-sanitized routing envelope first so sessions can
         // be recovered when CodingPet is relaunched. Both operations are best
         // effort and never affect the agent command's exit status.
-        HookEventSnapshotStore().persist(event)
+        if event.describesSessionState {
+            HookEventSnapshotStore().persist(event)
+        }
         HookSocketClient.send(event)
-        spawnClaudeUsageReportIfDue(after: event, environment: ProcessInfo.processInfo.environment)
+        spawnClaudeUsageReportIfDue(after: event)
     }
 
     static let reportClaudeUsageArgument = "--report-claude-usage"
 
-    /// Claude Desktop hands its sessions an OAuth token through the environment,
-    /// which hook processes inherit. The network lookup runs in a detached copy
-    /// of this executable so the hook itself still exits immediately; the token
-    /// travels only through the inherited environment, never on the command line.
-    private static func spawnClaudeUsageReportIfDue(
-        after event: HookEventEnvelope,
-        environment: [String: String]
-    ) {
+    /// Claude Desktop starts its sessions with an OAuth token in their
+    /// environment. Claude Code strips it before running hooks, but the Claude
+    /// process itself is an ancestor of this one and can be read like `ps eww`.
+    /// The network lookup runs in a detached copy of this executable so the hook
+    /// exits immediately; the token reaches it only through that child's
+    /// environment, never on a command line or on disk.
+    private static func spawnClaudeUsageReportIfDue(after event: HookEventEnvelope) {
         guard event.provider == .claudeCode,
               event.eventName == "Stop" || event.eventName == "SessionStart" else {
             return
         }
-        let hasToken = !(environment[ClaudeUsageEndpoint.tokenEnvironmentKey] ?? "").isEmpty
+        let token = ProcessEnvironmentReader.value(
+            of: ClaudeUsageEndpoint.tokenEnvironmentKey,
+            inAncestorsOf: getpid()
+        )
         let hasSocket = FileManager.default.fileExists(atPath: HookSocketAddress.defaultPath)
-        guard hasToken, hasSocket else {
+        guard let token, hasSocket else {
             ClaudeUsageEndpoint.log(
-                "\(event.eventName): skipped, token \(hasToken ? "present" : "absent"), app socket \(hasSocket ? "present" : "absent")"
+                "\(event.eventName): skipped, token \(token == nil ? "absent" : "present"), app socket \(hasSocket ? "present" : "absent")"
             )
             return
         }
@@ -71,6 +75,9 @@ enum CodingPetHookMain {
         let reporter = Process()
         reporter.executableURL = executableURL
         reporter.arguments = [reportClaudeUsageArgument, event.sessionID, event.cwd]
+        var environment = ProcessInfo.processInfo.environment
+        environment[ClaudeUsageEndpoint.tokenEnvironmentKey] = token
+        reporter.environment = environment
         reporter.standardInput = FileHandle.nullDevice
         reporter.standardOutput = FileHandle.nullDevice
         reporter.standardError = FileHandle.nullDevice

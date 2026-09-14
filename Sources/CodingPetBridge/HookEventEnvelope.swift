@@ -84,6 +84,16 @@ public struct HookEventEnvelope: Codable, Equatable, Sendable {
         eventName == StatusLinePayloadParser.eventName
     }
 
+    /// Background subagent start/stop notices for the parent session.
+    public var isSubagentLifecycle: Bool {
+        eventName == "SubagentStart" || eventName == "SubagentStop"
+    }
+
+    /// Events worth persisting as the session's latest state snapshot.
+    public var describesSessionState: Bool {
+        !isStatusLine && !isSubagentLifecycle
+    }
+
     /// Lifecycle boundaries that remove the provider session from CodingPet.
     /// Claude Stop is retained as a one-time Ready notification instead.
     public var clearsActiveSession: Bool {
