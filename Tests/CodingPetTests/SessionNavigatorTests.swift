@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import CodingPet
+import CodingPetBridge
 
 @MainActor
 struct SessionNavigatorTests {
@@ -33,6 +34,46 @@ struct SessionNavigatorTests {
 
         #expect(SessionNavigator.supportsDirectActivation(codex))
         #expect(!SessionNavigator.supportsDirectActivation(claude))
+    }
+
+    @Test
+    func claudeDesktopSessionBuildsAContinueDeepLinkOnlyWithALocalID() throws {
+        var session = makeSession(id: "claude-code:cli-uuid", provider: .claudeCode)
+        #expect(SessionNavigator.claudeDesktopSessionURL(for: session) == nil)
+
+        session.claudeDesktopSessionID = "local_c7be5754-7e39-4e20-afdc-86bfaad4b8b9"
+        let url = try #require(SessionNavigator.claudeDesktopSessionURL(for: session))
+        #expect(url.absoluteString == "claude://code/continue?session=local_c7be5754-7e39-4e20-afdc-86bfaad4b8b9")
+
+        session.claudeDesktopSessionID = "session_remote?x=1"
+        #expect(SessionNavigator.claudeDesktopSessionURL(for: session) == nil)
+    }
+
+    @Test
+    func desktopSessionIDSurvivesLaterHookEventsAndStoreUpdates() {
+        let store = SessionStore()
+        let start = HookEventEnvelope(
+            provider: .claudeCode,
+            eventName: "UserPromptSubmit",
+            timestamp: Date(timeIntervalSince1970: 1_800_000_000),
+            parentProcessID: nil,
+            sessionID: "cli-uuid",
+            cwd: "/tmp"
+        )
+        store.apply(start)
+        store.updateClaudeDesktopSessionID("local_abc", for: "claude-code:cli-uuid")
+        #expect(store.sessions.first?.claudeDesktopSessionID == "local_abc")
+
+        store.apply(HookEventEnvelope(
+            provider: .claudeCode,
+            eventName: "Stop",
+            timestamp: Date(timeIntervalSince1970: 1_800_000_010),
+            parentProcessID: nil,
+            sessionID: "cli-uuid",
+            cwd: "/tmp"
+        ))
+        #expect(store.sessions.first?.status == .ready)
+        #expect(store.sessions.first?.claudeDesktopSessionID == "local_abc")
     }
 
     @Test

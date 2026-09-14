@@ -82,6 +82,12 @@ final class SessionStore: ObservableObject {
         sessions[index].sessionName = trimmed
     }
 
+    func updateClaudeDesktopSessionID(_ desktopSessionID: String, for id: String) {
+        guard let index = sessions.firstIndex(where: { $0.id == id }),
+              sessions[index].claudeDesktopSessionID != desktopSessionID else { return }
+        sessions[index].claudeDesktopSessionID = desktopSessionID
+    }
+
     func markCodexThreadPersisted(for id: String) {
         guard let index = sessions.firstIndex(where: { $0.id == id }),
               sessions[index].provider == .codex else {

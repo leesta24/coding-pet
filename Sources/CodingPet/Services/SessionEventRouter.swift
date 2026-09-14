@@ -32,7 +32,8 @@ enum SessionEventRouter {
             updatedAt: event.timestamp,
             turnStartedAt: turnStartedAt,
             terminal: terminal,
-            codexThreadIsPersisted: existing?.codexThreadIsPersisted
+            codexThreadIsPersisted: existing?.codexThreadIsPersisted,
+            claudeDesktopSessionID: existing?.claudeDesktopSessionID
         )
     }
 

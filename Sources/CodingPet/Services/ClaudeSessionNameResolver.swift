@@ -75,6 +75,21 @@ actor ClaudeSessionNameResolver {
         return cachedNames[sessionID]
     }
 
+    /// Claude Desktop's `local_…` id for a CLI session, when the session is
+    /// hosted by Claude Desktop.
+    func desktopSessionID(for sessionID: String) async -> String? {
+        guard let desktopSessionsDirectory,
+              let entry = await desktopEntry(
+                  for: sessionID,
+                  sessionsDirectory: desktopSessionsDirectory,
+                  refresh: false
+              ),
+              !entry.isArchived else {
+            return nil
+        }
+        return entry.desktopSessionID
+    }
+
     /// Claude Desktop considers the currently selected session read even when
     /// its persisted focus timestamp predates the latest activity. The local
     /// focus event is therefore authoritative; timestamps remain the fallback

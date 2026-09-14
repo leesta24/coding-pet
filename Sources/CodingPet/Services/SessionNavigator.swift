@@ -15,6 +15,11 @@ enum SessionNavigator {
         }
 
         if let bundleIdentifier = preferredBundleIdentifier(for: session) {
+            if bundleIdentifier == claudeDesktopBundleIdentifier,
+               let sessionURL = claudeDesktopSessionURL(for: session),
+               NSWorkspace.shared.open(sessionURL) {
+                return
+            }
             activateApplication(bundleIdentifier: bundleIdentifier)
             return
         }
@@ -67,10 +72,23 @@ enum SessionNavigator {
         return URL(string: "codex://threads/\(threadID)")
     }
 
+    /// Claude Desktop selects a local session through
+    /// `claude://code/continue?session=local_…`; anything else only brings
+    /// the app forward.
+    static func claudeDesktopSessionURL(for session: AgentSession) -> URL? {
+        guard session.provider == .claudeCode,
+              let desktopSessionID = session.claudeDesktopSessionID,
+              desktopSessionID.wholeMatch(of: /local_[A-Za-z0-9-]{1,64}/) != nil else {
+            return nil
+        }
+        return URL(string: "claude://code/continue?session=\(desktopSessionID)")
+    }
+
     private static let codexBundleIdentifier = "com.openai.codex"
+    private static let claudeDesktopBundleIdentifier = "com.anthropic.claudefordesktop"
 
     private static let supportedClaudeTargets: Set<String> = [
-        "com.anthropic.claudefordesktop",
+        claudeDesktopBundleIdentifier,
         "com.apple.Terminal",
         "com.googlecode.iterm2",
         "dev.warp.Warp-Stable",

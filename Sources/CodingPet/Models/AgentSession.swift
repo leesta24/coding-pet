@@ -41,6 +41,8 @@ struct AgentSession: Identifiable, Codable, Hashable, Sendable {
     var turnStartedAt: Date? = nil
     var terminal: TerminalTarget?
     var codexThreadIsPersisted: Bool? = nil
+    /// Claude Desktop's own id for this session (`local_…`), used for deep links.
+    var claudeDesktopSessionID: String? = nil
 
     var displayName: String {
         if let sessionName, !sessionName.isEmpty {

@@ -368,14 +368,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         case .claudeCode:
             Task { @MainActor [weak sessionStore] in
-                guard let name = await claudeNameResolver.name(
+                if let name = await claudeNameResolver.name(
                     for: event.sessionID,
                     processID: event.parentProcessID,
                     refresh: true
-                ) else {
-                    return
+                ) {
+                    sessionStore?.updateSessionName(name, for: id)
                 }
-                sessionStore?.updateSessionName(name, for: id)
+                if let desktopSessionID = await claudeNameResolver.desktopSessionID(
+                    for: event.sessionID
+                ) {
+                    sessionStore?.updateClaudeDesktopSessionID(desktopSessionID, for: id)
+                }
             }
         }
     }
