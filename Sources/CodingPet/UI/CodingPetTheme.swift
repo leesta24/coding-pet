@@ -105,6 +105,59 @@ struct StatusPill: View {
     }
 }
 
+/// Trailing status affordance: a quiet spinner while working, a pill for
+/// states that need the user's eye. One encoding per row, not two.
+struct SessionStatusIndicator: View {
+    let status: SessionStatus
+    let animationsEnabled: Bool
+
+    var body: some View {
+        if status == .running {
+            RunningActivityIndicator(accent: .secondary, animationsEnabled: animationsEnabled)
+                .accessibilityLabel(status.displayName)
+        } else {
+            StatusPill(status: status)
+        }
+    }
+}
+
+struct RunningActivityIndicator: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let accent: Color
+    let animationsEnabled: Bool
+
+    var body: some View {
+        TimelineView(
+            .animation(
+                minimumInterval: 1.0 / 30.0,
+                paused: !animationsEnabled || reduceMotion
+            )
+        ) { timeline in
+            ZStack {
+                Circle()
+                    .stroke(accent.opacity(0.18), lineWidth: 1.5)
+                Circle()
+                    .trim(from: 0.08, to: 0.70)
+                    .stroke(
+                        accent,
+                        style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
+                    )
+                    .rotationEffect(rotation(at: timeline.date))
+            }
+        }
+        .frame(width: 14, height: 14)
+        .padding(2)
+    }
+
+    private func rotation(at date: Date) -> Angle {
+        guard animationsEnabled, !reduceMotion else { return .degrees(-70) }
+        let progress = date.timeIntervalSinceReferenceDate
+            .truncatingRemainder(dividingBy: 1.1) / 1.1
+        return .degrees(progress * 360 - 90)
+    }
+}
+
 struct DashedDivider: View {
     var body: some View {
         HairlineShape()

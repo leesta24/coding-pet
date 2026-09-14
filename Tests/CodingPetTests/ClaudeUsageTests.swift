@@ -66,6 +66,49 @@ struct ClaudeUsageTests {
     }
 
     @Test
+    func usageEndpointRequestAndResponseAreMappedToRateLimits() throws {
+        let request = ClaudeUsageEndpoint.request(token: "tok-1")
+        #expect(request.url == ClaudeUsageEndpoint.url)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer tok-1")
+        #expect(request.value(forHTTPHeaderField: "anthropic-beta") == "oauth-2025-04-20")
+
+        let limits = try #require(ClaudeUsageEndpoint.rateLimits(from: Data("""
+        {"five_hour":{"utilization":23.5,"resets_at":"2026-09-14T09:00:00Z"},
+         "seven_day":{"utilization":41.2,"resets_at":"2026-09-20T00:00:00.000Z"},
+         "seven_day_opus":null}
+        """.utf8)))
+        #expect(limits.fiveHour?.usedPercentage == 23.5)
+        #expect(limits.sevenDay?.resetsAt == Date(timeIntervalSince1970: 1789862400))
+        #expect(limits.spendLimit == nil)
+
+        #expect(ClaudeUsageEndpoint.rateLimits(from: Data(#"{"error":"rate_limit"}"#.utf8)) == nil)
+
+        let store = ClaudeUsageStore()
+        store.apply(HookEventEnvelope(
+            provider: .claudeCode,
+            eventName: StatusLinePayloadParser.eventName,
+            timestamp: .now,
+            parentProcessID: nil,
+            sessionID: "s",
+            cwd: "/",
+            rateLimits: limits
+        ))
+        #expect(store.snapshot?.windows.map(\.remainingPercent) == [76, 59])
+    }
+
+    @Test
+    func usageAttemptsAreThrottledThroughTheStampFile() throws {
+        let stamp = FileManager.default.temporaryDirectory
+            .appending(path: "codingpet-usage-\(UUID().uuidString)/claude-usage.stamp")
+        defer { try? FileManager.default.removeItem(at: stamp.deletingLastPathComponent()) }
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+        #expect(ClaudeUsageEndpoint.claimAttempt(stampURL: stamp, now: start))
+        #expect(!ClaudeUsageEndpoint.claimAttempt(stampURL: stamp, now: start.addingTimeInterval(30)))
+        #expect(ClaudeUsageEndpoint.claimAttempt(stampURL: stamp, now: start.addingTimeInterval(61)))
+    }
+
+    @Test
     func detailLineDropsSummariesThatRepeatTheStatusAndFormatsElapsedCompactly() {
         var session = AgentSession(
             id: "claude-code:x",

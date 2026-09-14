@@ -41,7 +41,7 @@ editor or terminal.
 | Completed attention state | Codex App unread state | Stop hook + Claude Desktop unread state |
 | Latest agent activity message | Codex local app-server | Allowlisted tool activity label |
 | Navigation | Exact Codex App task, then fallbacks | Claude Desktop or originating terminal/editor |
-| Usage window summary | Codex local app-server | Claude Code status line JSON (5h and weekly windows) |
+| Usage window summary | Codex local app-server | Claude Desktop session token via hooks, or terminal status line JSON (5h and weekly windows) |
 
 CodingPet observes and navigates. Permission approvals and user replies always
 remain inside Codex or Claude Code.

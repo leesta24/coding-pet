@@ -251,14 +251,9 @@ private struct SessionRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        // Top-aligned so the status pill sits on the title line; the provider
-        // tag lives on the detail line to keep titles from pushing it around.
+        // Top-aligned so the status indicator sits on the title line; the
+        // provider lives on the detail line so titles never push it around.
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: session.status.symbolName)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(session.status.tint)
-                .frame(width: 20, height: 18)
-
             VStack(alignment: .leading, spacing: 3) {
                 Text(session.displayName)
                     .font(.system(size: 13, weight: .medium))
@@ -271,7 +266,8 @@ private struct SessionRow: View {
 
             Spacer(minLength: 8)
 
-            StatusPill(status: session.status)
+            SessionStatusIndicator(status: session.status, animationsEnabled: true)
+                .frame(height: 18)
 
             Image(
                 systemName: SessionNavigator.supportsDirectActivation(session)

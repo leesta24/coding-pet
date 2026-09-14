@@ -14,6 +14,14 @@ enum CodingPetHookMain {
             runStatusLine(passthroughCommand: passthroughCommand(in: arguments))
             return
         }
+        if arguments.first == reportClaudeUsageArgument, arguments.count == 3 {
+            reportClaudeUsage(
+                sessionID: arguments[1],
+                cwd: arguments[2],
+                environment: ProcessInfo.processInfo.environment
+            )
+            return
+        }
 
         guard let provider = providerArgument(),
               let input = readInput(limit: maximumInputSize),
@@ -31,6 +39,74 @@ enum CodingPetHookMain {
         // effort and never affect the agent command's exit status.
         HookEventSnapshotStore().persist(event)
         HookSocketClient.send(event)
+        spawnClaudeUsageReportIfDue(after: event, environment: ProcessInfo.processInfo.environment)
+    }
+
+    static let reportClaudeUsageArgument = "--report-claude-usage"
+
+    /// Claude Desktop hands its sessions an OAuth token through the environment,
+    /// which hook processes inherit. The network lookup runs in a detached copy
+    /// of this executable so the hook itself still exits immediately; the token
+    /// travels only through the inherited environment, never on the command line.
+    private static func spawnClaudeUsageReportIfDue(
+        after event: HookEventEnvelope,
+        environment: [String: String]
+    ) {
+        guard event.provider == .claudeCode,
+              event.eventName == "Stop" || event.eventName == "SessionStart",
+              let token = environment[ClaudeUsageEndpoint.tokenEnvironmentKey],
+              !token.isEmpty,
+              FileManager.default.fileExists(atPath: HookSocketAddress.defaultPath),
+              ClaudeUsageEndpoint.claimAttempt(),
+              let executableURL = Bundle.main.executableURL else {
+            return
+        }
+        let reporter = Process()
+        reporter.executableURL = executableURL
+        reporter.arguments = [reportClaudeUsageArgument, event.sessionID, event.cwd]
+        reporter.standardInput = FileHandle.nullDevice
+        reporter.standardOutput = FileHandle.nullDevice
+        reporter.standardError = FileHandle.nullDevice
+        try? reporter.run()
+    }
+
+    private static func reportClaudeUsage(
+        sessionID: String,
+        cwd: String,
+        environment: [String: String]
+    ) {
+        guard let token = environment[ClaudeUsageEndpoint.tokenEnvironmentKey],
+              !token.isEmpty else {
+            return
+        }
+
+        let completion = DispatchSemaphore(value: 0)
+        var body: Data?
+        let task = URLSession.shared.dataTask(
+            with: ClaudeUsageEndpoint.request(token: token)
+        ) { data, response, _ in
+            if let status = (response as? HTTPURLResponse)?.statusCode,
+               (200..<300).contains(status) {
+                body = data
+            }
+            completion.signal()
+        }
+        task.resume()
+        guard completion.wait(timeout: .now() + 9) == .success,
+              let body,
+              let limits = ClaudeUsageEndpoint.rateLimits(from: body) else {
+            return
+        }
+
+        HookSocketClient.send(HookEventEnvelope(
+            provider: .claudeCode,
+            eventName: StatusLinePayloadParser.eventName,
+            timestamp: .now,
+            parentProcessID: nil,
+            sessionID: sessionID,
+            cwd: cwd,
+            rateLimits: limits
+        ))
     }
 
     /// Status line mode: forward Claude Code's usage windows to CodingPet, then

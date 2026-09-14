@@ -274,9 +274,6 @@ private struct SessionConversationBubble: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            statusIndicator
-                .frame(height: 18)
-
             VStack(alignment: .leading, spacing: 3) {
                 Text(session.displayName)
                     .font(.system(size: 13, weight: .medium))
@@ -289,7 +286,11 @@ private struct SessionConversationBubble: View {
 
             Spacer(minLength: 8)
 
-            StatusPill(status: session.status)
+            SessionStatusIndicator(
+                status: session.status,
+                animationsEnabled: animationsEnabled
+            )
+            .frame(height: 18)
         }
         .padding(.horizontal, 14)
         .frame(width: 304, height: 64)
@@ -318,59 +319,6 @@ private struct SessionConversationBubble: View {
         )
     }
 
-    @ViewBuilder
-    private var statusIndicator: some View {
-        if session.status == .running {
-            RunningActivityIndicator(
-                accent: .secondary,
-                animationsEnabled: animationsEnabled
-            )
-        } else {
-            Image(systemName: session.status.symbolName)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(session.status.tint)
-                .frame(width: 18, height: 18)
-                .accessibilityHidden(true)
-        }
-    }
-}
-
-private struct RunningActivityIndicator: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    let accent: Color
-    let animationsEnabled: Bool
-
-    var body: some View {
-        TimelineView(
-            .animation(
-                minimumInterval: 1.0 / 30.0,
-                paused: !animationsEnabled || reduceMotion
-            )
-        ) { timeline in
-            ZStack {
-                Circle()
-                    .stroke(accent.opacity(0.18), lineWidth: 1.5)
-                Circle()
-                    .trim(from: 0.08, to: 0.70)
-                    .stroke(
-                        accent,
-                        style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
-                    )
-                    .rotationEffect(rotation(at: timeline.date))
-            }
-        }
-        .frame(width: 14, height: 14)
-        .padding(2)
-        .accessibilityHidden(true)
-    }
-
-    private func rotation(at date: Date) -> Angle {
-        guard animationsEnabled, !reduceMotion else { return .degrees(-70) }
-        let progress = date.timeIntervalSinceReferenceDate
-            .truncatingRemainder(dividingBy: 1.1) / 1.1
-        return .degrees(progress * 360 - 90)
-    }
 }
 
 private struct CompactAttentionBubble: View {
