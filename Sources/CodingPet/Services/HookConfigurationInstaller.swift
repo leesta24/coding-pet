@@ -18,6 +18,7 @@ struct HookConfigurationInstaller {
         case invalidRootObject
         case invalidHooksObject
         case invalidHookEvent(String)
+        case invalidStatusLine
         case missingBackup
         case unsupportedMetadata
 
@@ -27,6 +28,7 @@ struct HookConfigurationInstaller {
             case .invalidRootObject: "The provider configuration must contain a JSON object."
             case .invalidHooksObject: "The hooks setting is not a JSON object."
             case let .invalidHookEvent(event): "The \(event) hook setting has an unsupported format."
+            case .invalidStatusLine: "The statusLine setting has an unsupported format."
             case .missingBackup: "The CodingPet hook backup is missing; the configuration was left unchanged."
             case .unsupportedMetadata: "The CodingPet hook installation metadata is not supported."
             }
@@ -36,6 +38,10 @@ struct HookConfigurationInstaller {
     static let ownershipMarker = "CodingPet session observer"
     static let agentPeekBridgeName = "AgentPeekBridge"
     static let agentPeekHookArgument = "--bridge-hook-event"
+    /// Claude Code pipes usage windows to its status line command. The owned
+    /// command is `'<hook>' --statusline [-- '<original command>']`.
+    static let statusLineArgument = "--statusline"
+    private static let statusLineOwnershipMarker = "' \(statusLineArgument)"
 
     let provider: HookConfigurationProvider
     let configURL: URL
@@ -61,16 +67,23 @@ struct HookConfigurationInstaller {
                   let root = try? Self.parseRoot(data) else {
                 return .notInstalled
             }
-            return ownedHandlerCount(in: root) == 0 ? .notInstalled : .needsRepair
+            return ownedHandlerCount(in: root) == 0 && !Self.ownsStatusLine(root)
+                ? .notInstalled
+                : .needsRepair
         }
 
         guard hasMetadata, hasBackup, hasConfig,
               let data = try? Data(contentsOf: configURL),
               let root = try? Self.parseRoot(data),
-              ownedHandlerCount(in: root) == eventDefinitions.count else {
+              ownedHandlerCount(in: root) == eventDefinitions.count,
+              !observesStatusLine || Self.ownsStatusLine(root) else {
             return .needsRepair
         }
         return .installed
+    }
+
+    private var observesStatusLine: Bool {
+        provider == .claudeCode
     }
 
     func validateInstall(removingAgentPeekHandlers: Bool = false) throws {
@@ -230,6 +243,65 @@ struct HookConfigurationInstaller {
             hooks[definition.name] = groups
         }
         root["hooks"] = hooks
+
+        if observesStatusLine {
+            try wrapStatusLine(in: &root)
+        }
+    }
+
+    /// Routes the status line through CodingPetHook while keeping the user's
+    /// own command running behind it. Other `statusLine` keys are preserved.
+    private func wrapStatusLine(in root: inout [String: Any]) throws {
+        var statusLine: [String: Any]
+        var original: String?
+        if let value = root["statusLine"] {
+            guard let existing = value as? [String: Any] else {
+                throw Error.invalidStatusLine
+            }
+            statusLine = existing
+            if let command = existing["command"] {
+                guard let command = command as? String else {
+                    throw Error.invalidStatusLine
+                }
+                original = command
+            }
+        } else {
+            statusLine = [:]
+        }
+
+        var command = "\(Self.shellQuote(hookExecutableURL.path)) \(Self.statusLineArgument)"
+        if let original, !original.isEmpty {
+            command += " -- \(Self.shellQuote(original))"
+        }
+        statusLine["type"] = "command"
+        statusLine["command"] = command
+        root["statusLine"] = statusLine
+    }
+
+    static func ownsStatusLine(_ root: [String: Any]) -> Bool {
+        guard let statusLine = root["statusLine"] as? [String: Any],
+              let command = statusLine["command"] as? String else {
+            return false
+        }
+        return command.hasPrefix("'") && command.contains(statusLineOwnershipMarker)
+    }
+
+    /// Restores the wrapped command, or removes `statusLine` when there was none.
+    private static func unwrapStatusLine(from root: inout [String: Any]) {
+        guard ownsStatusLine(root),
+              var statusLine = root["statusLine"] as? [String: Any],
+              let command = statusLine["command"] as? String,
+              let markerRange = command.range(of: statusLineOwnershipMarker) else {
+            return
+        }
+        let remainder = command[markerRange.upperBound...]
+        guard remainder.hasPrefix(" -- "),
+              let original = shellUnquote(String(remainder.dropFirst(4))) else {
+            root.removeValue(forKey: "statusLine")
+            return
+        }
+        statusLine["command"] = original
+        root["statusLine"] = statusLine
     }
 
     private func ownedHandlerCount(in root: [String: Any]) -> Int {
@@ -351,6 +423,7 @@ struct HookConfigurationInstaller {
         _ = try removeHandlers(from: &root) {
             $0["statusMessage"] as? String == ownershipMarker
         }
+        unwrapStatusLine(from: &root)
     }
 
     private static func removeAgentPeekHandlers(from root: inout [String: Any]) throws -> Int {
@@ -415,6 +488,13 @@ struct HookConfigurationInstaller {
 
     private static func shellQuote(_ value: String) -> String {
         "'\(value.replacingOccurrences(of: "'", with: "'\"'\"'"))'"
+    }
+
+    /// Inverse of `shellQuote` for a single quoted word.
+    private static func shellUnquote(_ value: String) -> String? {
+        guard value.count >= 2, value.hasPrefix("'"), value.hasSuffix("'") else { return nil }
+        return String(value.dropFirst().dropLast())
+            .replacingOccurrences(of: "'\"'\"'", with: "'")
     }
 
     private static func digest(_ data: Data) -> String {

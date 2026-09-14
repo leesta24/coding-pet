@@ -33,7 +33,7 @@ struct CodexUsageReaderTests {
 
     @Test @MainActor
     func storeReadsOnlyWhenTheCodexHookIsInstalled() async {
-        let expected = CodexUsageSnapshot(windows: [
+        let expected = UsageSnapshot(windows: [
             .init(label: "5h", remainingPercent: 72, resetsAt: nil)
         ])
         let reader = FakeUsageReader(snapshot: expected)
@@ -88,14 +88,14 @@ private final class FakeCodexUsageSession: CodexAppServerSessionProtocol, @unche
 }
 
 private actor FakeUsageReader: CodexUsageReading {
-    let snapshotValue: CodexUsageSnapshot?
+    let snapshotValue: UsageSnapshot?
     private(set) var readCount = 0
 
-    init(snapshot: CodexUsageSnapshot?) {
+    init(snapshot: UsageSnapshot?) {
         snapshotValue = snapshot
     }
 
-    func snapshot() async -> CodexUsageSnapshot? {
+    func snapshot() async -> UsageSnapshot? {
         readCount += 1
         return snapshotValue
     }

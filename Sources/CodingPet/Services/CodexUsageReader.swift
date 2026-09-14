@@ -1,6 +1,6 @@
 import Foundation
 
-struct CodexUsageSnapshot: Equatable, Sendable {
+struct UsageSnapshot: Equatable, Sendable {
     struct Window: Equatable, Sendable {
         let label: String
         let remainingPercent: Int
@@ -11,7 +11,7 @@ struct CodexUsageSnapshot: Equatable, Sendable {
 }
 
 protocol CodexUsageReading: Sendable {
-    func snapshot() async -> CodexUsageSnapshot?
+    func snapshot() async -> UsageSnapshot?
 }
 
 actor CodexUsageReader: CodexUsageReading {
@@ -32,7 +32,7 @@ actor CodexUsageReader: CodexUsageReading {
         self.sessionFactory = sessionFactory
     }
 
-    func snapshot() async -> CodexUsageSnapshot? {
+    func snapshot() async -> UsageSnapshot? {
         do {
             let result = try activeSession().call(
                 method: "account/rateLimits/read",
@@ -45,7 +45,7 @@ actor CodexUsageReader: CodexUsageReading {
         }
     }
 
-    static func parseSnapshot(from result: [String: Any]) -> CodexUsageSnapshot? {
+    static func parseSnapshot(from result: [String: Any]) -> UsageSnapshot? {
         let bucket: [String: Any]?
         if let buckets = result["rateLimitsByLimitId"] as? [String: Any],
            let codexBucket = buckets["codex"] as? [String: Any] {
@@ -59,20 +59,20 @@ actor CodexUsageReader: CodexUsageReading {
             parseWindow(bucket["primary"], fallbackLabel: "Primary"),
             parseWindow(bucket["secondary"], fallbackLabel: "Secondary")
         ].compactMap { $0 }
-        return windows.isEmpty ? nil : CodexUsageSnapshot(windows: windows)
+        return windows.isEmpty ? nil : UsageSnapshot(windows: windows)
     }
 
     private static func parseWindow(
         _ value: Any?,
         fallbackLabel: String
-    ) -> CodexUsageSnapshot.Window? {
+    ) -> UsageSnapshot.Window? {
         guard let object = value as? [String: Any],
               let usedPercent = (object["usedPercent"] as? NSNumber)?.intValue else {
             return nil
         }
         let duration = (object["windowDurationMins"] as? NSNumber)?.intValue
         let resetTimestamp = (object["resetsAt"] as? NSNumber)?.doubleValue
-        return CodexUsageSnapshot.Window(
+        return UsageSnapshot.Window(
             label: windowLabel(durationMinutes: duration, fallback: fallbackLabel),
             remainingPercent: 100 - min(max(usedPercent, 0), 100),
             resetsAt: resetTimestamp.map(Date.init(timeIntervalSince1970:))
@@ -108,7 +108,7 @@ actor CodexUsageReader: CodexUsageReading {
 final class CodexUsageStore: ObservableObject {
     typealias HookStatusProvider = @MainActor () -> HookInstallationStatus
 
-    @Published private(set) var snapshot: CodexUsageSnapshot?
+    @Published private(set) var snapshot: UsageSnapshot?
 
     private let statusProvider: HookStatusProvider
     private let reader: any CodexUsageReading
@@ -117,7 +117,7 @@ final class CodexUsageStore: ObservableObject {
     init(
         statusProvider: @escaping HookStatusProvider,
         reader: any CodexUsageReading = CodexUsageReader(),
-        initialSnapshot: CodexUsageSnapshot? = nil
+        initialSnapshot: UsageSnapshot? = nil
     ) {
         self.statusProvider = statusProvider
         self.reader = reader

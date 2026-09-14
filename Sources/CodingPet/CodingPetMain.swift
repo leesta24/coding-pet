@@ -72,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let catalogReconciliationFrequency = 5
 
     private let sessionStore: SessionStore
+    private let claudeUsageStore: ClaudeUsageStore
     private let eventSnapshotStore = HookEventSnapshotStore()
     private let codexSessionNameResolver = CodexSessionNameResolver()
     private let claudeSessionNameResolver = ClaudeSessionNameResolver()
@@ -85,8 +86,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     override init() {
         if CommandLine.arguments.contains("--demo") {
             sessionStore = SessionStore(sessions: .demo)
+            claudeUsageStore = ClaudeUsageStore(initialSnapshot: UsageSnapshot(windows: [
+                .init(label: "5h", remainingPercent: 64, resetsAt: nil),
+                .init(label: "Week", remainingPercent: 42, resetsAt: nil)
+            ]))
         } else {
             sessionStore = SessionStore()
+            claudeUsageStore = ClaudeUsageStore()
         }
         super.init()
     }
@@ -106,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let snapshots = eventSnapshotStore
         botWindowController = BotWindowController(
             store: sessionStore,
+            claudeUsageStore: claudeUsageStore,
             onAcknowledge: { session in
                 snapshots.remove(
                     provider: session.provider == .codex ? .codex : .claudeCode,
@@ -316,6 +323,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         codexNameResolver: CodexSessionNameResolver,
         claudeNameResolver: ClaudeSessionNameResolver
     ) {
+        if event.isStatusLine {
+            claudeUsageStore.apply(event)
+            return
+        }
         sessionStore.apply(event)
         guard !event.clearsActiveSession else { return }
 

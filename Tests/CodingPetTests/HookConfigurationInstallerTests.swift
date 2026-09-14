@@ -59,6 +59,80 @@ struct HookConfigurationInstallerTests {
     }
 
     @Test
+    func claudeInstallWrapsTheStatusLineAndUninstallUnwrapsIt() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let configURL = directory.appending(path: "settings.json")
+        let original = Data(#"{"statusLine":{"type":"command","command":"~/.claude/statusline.sh","padding":0}}"#.utf8)
+        try original.write(to: configURL)
+        let installer = HookConfigurationInstaller(
+            provider: .claudeCode,
+            configURL: configURL,
+            hookExecutableURL: URL(fileURLWithPath: "/Apps/Coding Pet.app/CodingPetHook")
+        )
+
+        try installer.install()
+        try installer.install()
+
+        let installed = try jsonObject(at: configURL)
+        let statusLine = try #require(installed["statusLine"] as? [String: Any])
+        #expect(statusLine["type"] as? String == "command")
+        #expect(statusLine["padding"] as? Int == 0)
+        #expect(
+            statusLine["command"] as? String
+                == "'/Apps/Coding Pet.app/CodingPetHook' --statusline -- '~/.claude/statusline.sh'"
+        )
+        #expect(installer.installationStatus() == .installed)
+
+        // Someone replacing the status line takes usage reporting away.
+        var edited = installed
+        edited["statusLine"] = ["type": "command", "command": "/other"]
+        try JSONSerialization.data(withJSONObject: edited).write(to: configURL)
+        #expect(installer.installationStatus() == .needsRepair)
+        try installer.install()
+        #expect(installer.installationStatus() == .installed)
+
+        // Edits made after install fall back to unwrapping instead of the backup.
+        var current = try jsonObject(at: configURL)
+        current["theme"] = "dark"
+        try JSONSerialization.data(withJSONObject: current).write(to: configURL)
+        try installer.uninstall()
+
+        let uninstalled = try jsonObject(at: configURL)
+        let restored = try #require(uninstalled["statusLine"] as? [String: Any])
+        #expect(restored["command"] as? String == "/other")
+        #expect(uninstalled["theme"] as? String == "dark")
+        #expect(codingPetHandlerCount(in: uninstalled) == 0)
+    }
+
+    @Test
+    func claudeInstallWithoutAStatusLineAddsOneAndRemovesItOnUnwrap() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let configURL = directory.appending(path: "settings.json")
+        try Data(#"{"theme":"dark"}"#.utf8).write(to: configURL)
+        let installer = HookConfigurationInstaller(
+            provider: .claudeCode,
+            configURL: configURL,
+            hookExecutableURL: URL(fileURLWithPath: "/tmp/CodingPetHook")
+        )
+
+        try installer.install()
+        let installed = try jsonObject(at: configURL)
+        let statusLine = try #require(installed["statusLine"] as? [String: Any])
+        #expect(statusLine["command"] as? String == "'/tmp/CodingPetHook' --statusline")
+
+        var current = installed
+        current["userAdded"] = true
+        try JSONSerialization.data(withJSONObject: current).write(to: configURL)
+        try installer.uninstall()
+
+        let uninstalled = try jsonObject(at: configURL)
+        #expect(uninstalled["statusLine"] == nil)
+        #expect(uninstalled["userAdded"] as? Bool == true)
+    }
+
+    @Test
     func reinstallIsIdempotentAndKeepsFirstBackup() throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

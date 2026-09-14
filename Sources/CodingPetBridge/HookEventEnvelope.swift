@@ -49,6 +49,8 @@ public struct HookEventEnvelope: Codable, Equatable, Sendable {
     public let parentProcessID: Int32?
     public let sessionID: String
     public let cwd: String
+    /// Present only on `StatusLine` events from Claude Code.
+    public let rateLimits: HookRateLimits?
 
     public init(
         protocolVersion: Int = currentProtocolVersion,
@@ -61,7 +63,8 @@ public struct HookEventEnvelope: Codable, Equatable, Sendable {
         timestamp: Date,
         parentProcessID: Int32?,
         sessionID: String,
-        cwd: String
+        cwd: String,
+        rateLimits: HookRateLimits? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.provider = provider
@@ -74,6 +77,11 @@ public struct HookEventEnvelope: Codable, Equatable, Sendable {
         self.parentProcessID = parentProcessID
         self.sessionID = sessionID
         self.cwd = cwd
+        self.rateLimits = rateLimits
+    }
+
+    public var isStatusLine: Bool {
+        eventName == StatusLinePayloadParser.eventName
     }
 
     /// Lifecycle boundaries that remove the provider session from CodingPet.

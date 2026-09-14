@@ -35,6 +35,7 @@ final class BotWindowController {
         store: SessionStore,
         appearanceStore: PetAppearanceStore = PetAppearanceStore(),
         bubbleSettingsStore: SessionBubbleSettingsStore = SessionBubbleSettingsStore(),
+        claudeUsageStore: ClaudeUsageStore = ClaudeUsageStore(),
         onAcknowledge: @escaping @MainActor (AgentSession) -> Void = { _ in },
         navigateToSession: @escaping @MainActor (AgentSession) -> Void = {
             SessionNavigator.activate($0)
@@ -86,6 +87,7 @@ final class BotWindowController {
         sessionPanel = SessionPanelController(
             store: store,
             codexUsageStore: codexUsageStore,
+            claudeUsageStore: claudeUsageStore,
             onAcknowledge: onAcknowledge,
             navigateToSession: navigateToSession,
             onNavigationUnavailable: { _, anchorFrame in

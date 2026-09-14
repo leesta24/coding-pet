@@ -41,7 +41,7 @@ editor or terminal.
 | Completed attention state | Codex App unread state | Stop hook + Claude Desktop unread state |
 | Latest agent activity message | Codex local app-server | Allowlisted tool activity label |
 | Navigation | Exact Codex App task, then fallbacks | Claude Desktop or originating terminal/editor |
-| Usage window summary | Codex local app-server | Not currently exposed |
+| Usage window summary | Codex local app-server | Claude Code status line JSON (5h and weekly windows) |
 
 CodingPet observes and navigates. Permission approvals and user replies always
 remain inside Codex or Claude Code.
@@ -155,6 +155,9 @@ Open the pet, choose **Settings → Integrations**, then install Codex CLI and
 Claude Code independently. CodingPet:
 
 - merges its handlers instead of replacing existing configuration;
+- routes the Claude Code `statusLine` command through `CodingPetHook` to read
+  usage windows locally, then runs your original status line command unchanged
+  (uninstall restores it);
 - creates permission-restricted backups;
 - activates its own Codex hook hashes through the local Codex app-server;
 - removes only CodingPet-owned handlers during uninstall;

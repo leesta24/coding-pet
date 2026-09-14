@@ -328,17 +328,27 @@ struct PetAppearanceRenderingTests {
     @Test
     func rendersAdaptiveTwoRowSessionPanel() throws {
         let store = SessionStore(sessions: .demo)
-        let usage = CodexUsageSnapshot(windows: [
+        let usage = UsageSnapshot(windows: [
             .init(label: "5h", remainingPercent: 72, resetsAt: nil),
             .init(label: "Week", remainingPercent: 61, resetsAt: nil)
         ])
-        let preview = SessionPanelView(usageSnapshot: usage) { _ in }
+        let claudeUsage = UsageSnapshot(windows: [
+            .init(label: "5h", remainingPercent: 64, resetsAt: nil),
+            .init(label: "Week", remainingPercent: 42, resetsAt: nil)
+        ])
+        let preview = SessionPanelView(
+            usageSnapshot: usage,
+            claudeUsageSnapshot: claudeUsage
+        ) { _ in }
             .environmentObject(store)
             .environment(\.colorScheme, .light)
 
         let pngData = try renderHostedPNG(
             preview,
-            size: SessionPanelLayout.size(sessionCount: store.activeSessions.count)
+            size: SessionPanelLayout.size(
+                sessionCount: store.activeSessions.count,
+                showsUsage: true
+            )
         )
         #expect(pngData.count > 10_000)
 

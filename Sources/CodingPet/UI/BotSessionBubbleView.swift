@@ -282,24 +282,25 @@ private struct SessionConversationBubble: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             statusIndicator
+                .frame(height: 18)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(session.displayName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                Text(session.displayName)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(height: 18)
 
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
                     ProviderBadge(provider: session.provider)
+                    Text(session.summary.isEmpty ? fallbackSummary : session.summary)
+                        .lineLimit(session.status == .running ? 2 : 1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Text(session.summary.isEmpty ? fallbackSummary : session.summary)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(session.status == .running ? 2 : 1)
-                    .fixedSize(horizontal: false, vertical: true)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 8)

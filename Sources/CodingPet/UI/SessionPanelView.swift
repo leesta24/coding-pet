@@ -6,15 +6,18 @@ enum SessionPanelLayout {
     static let maximumVisibleRows = 4
     static let rowHeight: CGFloat = 52
     static let emptyHeight: CGFloat = 170
+    /// Usage line (16pt) plus its spacing below the header.
+    static let usageRowHeight: CGFloat = 22
 
-    static func size(sessionCount: Int) -> NSSize {
+    static func size(sessionCount: Int, showsUsage: Bool = false) -> NSSize {
+        let usageHeight = showsUsage ? usageRowHeight : 0
         guard sessionCount > 0 else {
-            return NSSize(width: width, height: emptyHeight)
+            return NSSize(width: width, height: emptyHeight + usageHeight)
         }
         let visibleRows = min(sessionCount, maximumVisibleRows)
         return NSSize(
             width: width,
-            height: 80 + CGFloat(visibleRows) * rowHeight
+            height: 80 + usageHeight + CGFloat(visibleRows) * rowHeight
         )
     }
 
@@ -28,25 +31,39 @@ struct SessionPanelView: View {
 
     let onSelect: (AgentSession) -> Void
     let onOpenSettings: () -> Void
-    let usageSnapshot: CodexUsageSnapshot?
+    let usageSnapshot: UsageSnapshot?
+    let claudeUsageSnapshot: UsageSnapshot?
 
     init(
-        usageSnapshot: CodexUsageSnapshot? = nil,
+        usageSnapshot: UsageSnapshot? = nil,
+        claudeUsageSnapshot: UsageSnapshot? = nil,
         onSelect: @escaping (AgentSession) -> Void,
         onOpenSettings: @escaping () -> Void = {}
     ) {
         self.usageSnapshot = usageSnapshot
+        self.claudeUsageSnapshot = claudeUsageSnapshot
         self.onSelect = onSelect
         self.onOpenSettings = onOpenSettings
     }
 
+    private var showsUsage: Bool {
+        usageSnapshot != nil || claudeUsageSnapshot != nil
+    }
+
     var body: some View {
-        let size = SessionPanelLayout.size(sessionCount: sortedSessions.count)
+        let size = SessionPanelLayout.size(
+            sessionCount: sortedSessions.count,
+            showsUsage: showsUsage
+        )
 
         VStack(spacing: 6) {
             header
                 .frame(height: 26)
-                .animation(.easeOut(duration: 0.18), value: usageSnapshot)
+
+            if showsUsage {
+                usageRow
+                    .frame(height: SessionPanelLayout.usageRowHeight - 6)
+            }
 
             if sortedSessions.isEmpty {
                 emptyState
@@ -83,13 +100,23 @@ struct SessionPanelView: View {
 
             Spacer()
 
-            if let usageSnapshot {
-                CodexUsageSummaryView(snapshot: usageSnapshot)
-                    .transition(.opacity)
-            }
-
             settingsButton
         }
+    }
+
+    private var usageRow: some View {
+        HStack(spacing: 16) {
+            if let usageSnapshot {
+                UsageSummaryView(providerName: "Codex", snapshot: usageSnapshot)
+            }
+            if let claudeUsageSnapshot {
+                UsageSummaryView(providerName: "Claude", snapshot: claudeUsageSnapshot)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 6)
+        .animation(.easeOut(duration: 0.18), value: usageSnapshot)
+        .animation(.easeOut(duration: 0.18), value: claudeUsageSnapshot)
     }
 
     private var settingsButton: some View {
@@ -167,12 +194,13 @@ struct SessionPanelView: View {
     }
 }
 
-private struct CodexUsageSummaryView: View {
-    let snapshot: CodexUsageSnapshot
+private struct UsageSummaryView: View {
+    let providerName: String
+    let snapshot: UsageSnapshot
 
     var body: some View {
         HStack(spacing: 6) {
-            Text("Codex")
+            Text(providerName)
                 .foregroundStyle(.secondary)
 
             ForEach(Array(snapshot.windows.prefix(2).enumerated()), id: \.offset) { index, window in
@@ -203,7 +231,7 @@ private struct CodexUsageSummaryView: View {
         let windows = snapshot.windows.prefix(2).map {
             "\($0.label) \($0.remainingPercent) percent remaining"
         }
-        return "Codex usage, " + windows.joined(separator: ", ")
+        return "\(providerName) usage, " + windows.joined(separator: ", ")
     }
 }
 
@@ -223,23 +251,23 @@ private struct SessionRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        // Top-aligned so the status pill sits on the title line; the provider
+        // tag lives on the detail line to keep titles from pushing it around.
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: session.status.symbolName)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(session.status.tint)
-                .frame(width: 20)
+                .frame(width: 20, height: 18)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(session.displayName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    ProviderBadge(provider: session.provider)
-                }
+                Text(session.displayName)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(height: 18)
 
                 HStack(spacing: 5) {
+                    ProviderBadge(provider: session.provider)
                     Text(session.summary)
                         .lineLimit(1)
                     Text("·")
@@ -262,6 +290,7 @@ private struct SessionRow: View {
             .font(.system(size: 10, weight: .medium))
             .foregroundStyle(.secondary)
             .opacity(isHovered ? 0.9 : 0.35)
+            .frame(height: 18)
         }
         .padding(.horizontal, 14)
         .frame(height: SessionPanelLayout.rowHeight)

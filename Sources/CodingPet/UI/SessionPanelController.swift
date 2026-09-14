@@ -17,10 +17,12 @@ final class SessionPanelController {
     private var sessionsCancellable: AnyCancellable?
     private weak var anchorPanel: NSPanel?
     private let codexUsageStore: CodexUsageStore
+    private let claudeUsageStore: ClaudeUsageStore
 
     init(
         store: SessionStore,
         codexUsageStore: CodexUsageStore? = nil,
+        claudeUsageStore: ClaudeUsageStore = ClaudeUsageStore(),
         onAcknowledge: @escaping @MainActor (AgentSession) -> Void = { _ in },
         navigateToSession: @escaping @MainActor (AgentSession) -> Void = {
             SessionNavigator.activate($0)
@@ -32,12 +34,14 @@ final class SessionPanelController {
             statusProvider: { .notInstalled }
         )
         self.codexUsageStore = usageStore
+        self.claudeUsageStore = claudeUsageStore
         self.store = store
         self.onAcknowledge = onAcknowledge
         self.navigateToSession = navigateToSession
         self.onNavigationUnavailable = onNavigationUnavailable
         let initialSize = SessionPanelLayout.size(
-            sessionCount: store.activeSessions.count
+            sessionCount: store.activeSessions.count,
+            showsUsage: usageStore.snapshot != nil || claudeUsageStore.snapshot != nil
         )
         panel = FocusPreservingPanel(
             contentRect: NSRect(origin: .zero, size: initialSize),
@@ -60,6 +64,7 @@ final class SessionPanelController {
         let hostingView = NSHostingView(
             rootView: SessionPanelRootView(
                 usageStore: usageStore,
+                claudeUsageStore: claudeUsageStore,
                 onSelect: { [weak self] session in
                     self?.handleSessionActivation(session)
                 },
@@ -75,13 +80,17 @@ final class SessionPanelController {
         hostingView.sizingOptions = []
         panel.contentView = hostingView
 
-        sessionsCancellable = store.$sessions
-            .map { sessions in
-                sessions.count { $0.status.isActive }
-            }
+        let sessionCounts = store.$sessions.map { sessions in
+            sessions.count { $0.status.isActive }
+        }
+        let showsUsage = usageStore.$snapshot
+            .combineLatest(claudeUsageStore.$snapshot) { $0 != nil || $1 != nil }
+        sessionsCancellable = sessionCounts
+            .combineLatest(showsUsage)
+            .map { SessionPanelLayout.size(sessionCount: $0, showsUsage: $1) }
             .removeDuplicates()
-            .sink { [weak self] sessionCount in
-                self?.updatePanelSize(sessionCount: sessionCount)
+            .sink { [weak self] size in
+                self?.updatePanelSize(size)
             }
     }
 
@@ -207,8 +216,7 @@ final class SessionPanelController {
         panel.parent?.removeChildWindow(panel)
     }
 
-    private func updatePanelSize(sessionCount: Int) {
-        let size = SessionPanelLayout.size(sessionCount: sessionCount)
+    private func updatePanelSize(_ size: NSSize) {
         guard panel.frame.size != size else { return }
         panel.setContentSize(size)
         if panel.isVisible, let anchorPanel {
@@ -233,12 +241,14 @@ final class SessionPanelController {
 
 private struct SessionPanelRootView: View {
     @ObservedObject var usageStore: CodexUsageStore
+    @ObservedObject var claudeUsageStore: ClaudeUsageStore
     let onSelect: (AgentSession) -> Void
     let onOpenSettings: () -> Void
 
     var body: some View {
         SessionPanelView(
             usageSnapshot: usageStore.snapshot,
+            claudeUsageSnapshot: claudeUsageStore.snapshot,
             onSelect: onSelect,
             onOpenSettings: onOpenSettings
         )
