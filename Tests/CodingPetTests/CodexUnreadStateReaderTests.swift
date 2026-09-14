@@ -24,6 +24,58 @@ struct CodexUnreadStateReaderTests {
     }
 
     @Test
+    func readsTheVersionedThreadReadStateAcrossIdentitiesAndLocalHosts() async throws {
+        let file = try temporaryStateFile(contents: #"""
+        {
+          "electron-persisted-atom-state": {
+            "unread-thread-ids-by-host-v1": {"local": ["stale-legacy-thread"]}
+          },
+          "electron-thread-read-state-v1": {
+            "version": 1,
+            "unreadByIdentity": {
+              "identity-a": {
+                "local:092af2cb": ["thread-a", "thread-b"],
+                "remote:abc": ["remote-thread"]
+              },
+              "identity-b": {
+                "local": ["thread-c"]
+              }
+            },
+            "legacyMigration": {"unreadThreadIdsByHostId": {"local": ["migrated"]}}
+          }
+        }
+        """#)
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+
+        #expect(await CodexUnreadStateReader(stateURL: file)
+            .localUnreadThreadIDs() == ["thread-a", "thread-b", "thread-c"])
+    }
+
+    @Test
+    func emptyVersionedReadStateMeansEverythingIsRead() async throws {
+        let file = try temporaryStateFile(contents: #"""
+        {
+          "electron-persisted-atom-state": {},
+          "electron-thread-read-state-v1": {
+            "version": 1,
+            "unreadByIdentity": {"identity": {"local:092af2cb": []}}
+          }
+        }
+        """#)
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+
+        #expect(await CodexUnreadStateReader(stateURL: file).localUnreadThreadIDs() == [])
+    }
+
+    @Test
+    func stateWithoutAnyUnreadIndexIsUnknown() async throws {
+        let file = try temporaryStateFile(contents: #"{"electron-persisted-atom-state": {}}"#)
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+
+        #expect(await CodexUnreadStateReader(stateURL: file).localUnreadThreadIDs() == nil)
+    }
+
+    @Test
     func missingLocalHostMeansThereAreNoLocalUnreadThreads() async throws {
         let file = try temporaryStateFile(contents: #"""
         {

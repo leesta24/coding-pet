@@ -7,8 +7,14 @@ actor CodexSessionNameResolver {
 
     typealias Lookup = @Sendable (String) -> Resolution?
 
+    /// Codex names a thread asynchronously after its first turn, so an unnamed
+    /// resolution is retried on later events, but not on every tool event
+    /// because each lookup launches a Codex app-server process.
+    static let unnamedRetryInterval: TimeInterval = 15
+
     private let lookup: Lookup
     private var cachedResolutions: [String: Resolution] = [:]
+    private var unnamedLookupDates: [String: Date] = [:]
 
     init(codexExecutableURL: URL? = nil) {
         lookup = { sessionID in
@@ -38,10 +44,17 @@ actor CodexSessionNameResolver {
 
     func resolution(
         for sessionID: String,
-        refresh: Bool = false
+        refresh: Bool = false,
+        now: Date = .now
     ) async -> Resolution? {
         if !refresh, let cachedResolution = cachedResolutions[sessionID] {
-            return cachedResolution
+            if cachedResolution.name != nil {
+                return cachedResolution
+            }
+            if let lastLookup = unnamedLookupDates[sessionID],
+               now.timeIntervalSince(lastLookup) < Self.unnamedRetryInterval {
+                return cachedResolution
+            }
         }
 
         let lookup = self.lookup
@@ -50,13 +63,18 @@ actor CodexSessionNameResolver {
         }.value
         if let resolution {
             cachedResolutions[sessionID] = resolution
+            if resolution.name == nil {
+                unnamedLookupDates[sessionID] = now
+            } else {
+                unnamedLookupDates.removeValue(forKey: sessionID)
+            }
             return resolution
         }
         return cachedResolutions[sessionID]
     }
 
-    func name(for sessionID: String, refresh: Bool = false) async -> String? {
-        await resolution(for: sessionID, refresh: refresh)?.name
+    func name(for sessionID: String, refresh: Bool = false, now: Date = .now) async -> String? {
+        await resolution(for: sessionID, refresh: refresh, now: now)?.name
     }
 
     static func extractResolution(from result: [String: Any]) -> Resolution? {

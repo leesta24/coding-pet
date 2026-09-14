@@ -1,8 +1,13 @@
 import Foundation
 
-/// Reads only Codex App's versioned local unread-thread index. This is a
-/// secondary, read-only projection used to distinguish Ready from ordinary
-/// completed/idle threads; hooks remain the primary lifecycle integration.
+/// Reads only Codex App's local unread-thread index. This is a secondary,
+/// read-only projection used to distinguish Ready from ordinary completed/idle
+/// threads; hooks remain the primary lifecycle integration.
+///
+/// Newer Codex builds keep the index in the top-level
+/// `electron-thread-read-state-v1` store, keyed by account identity and host
+/// (`local:<hash>`); older builds kept `unread-thread-ids-by-host-v1` inside
+/// the persisted atom state. Both are understood.
 actor CodexUnreadStateReader {
     private static let maximumStateFileSize = 4 * 1024 * 1024
     private static let maximumUnreadThreadCount = 10_000
@@ -23,17 +28,30 @@ actor CodexUnreadStateReader {
               fileSize > 0,
               fileSize <= Self.maximumStateFileSize,
               let data = try? Data(contentsOf: stateURL),
-              let state = try? JSONDecoder().decode(GlobalState.self, from: data),
-              let unreadByHost = state.persistedAtomState.unreadThreadIDsByHost else {
+              let state = try? JSONDecoder().decode(GlobalState.self, from: data) else {
             return nil
         }
 
-        let threadIDs = unreadByHost["local"] ?? []
+        let threadIDs: [String]
+        if let readState = state.threadReadState {
+            threadIDs = readState.unreadByIdentity?.values.flatMap { hosts in
+                hosts.filter { Self.isLocalHost($0.key) }.values.flatMap { $0 }
+            } ?? []
+        } else if let unreadByHost = state.persistedAtomState?.unreadThreadIDsByHost {
+            threadIDs = unreadByHost["local"] ?? []
+        } else {
+            return nil
+        }
+
         guard threadIDs.count <= Self.maximumUnreadThreadCount,
               threadIDs.allSatisfy({ !$0.isEmpty && $0.count <= 256 }) else {
             return nil
         }
         return Set(threadIDs)
+    }
+
+    private static func isLocalHost(_ key: String) -> Bool {
+        key == "local" || key.hasPrefix("local:")
     }
 
     private static var defaultStateURL: URL {
@@ -49,10 +67,12 @@ actor CodexUnreadStateReader {
     }
 
     private struct GlobalState: Decodable {
-        let persistedAtomState: PersistedAtomState
+        let persistedAtomState: PersistedAtomState?
+        let threadReadState: ThreadReadState?
 
         enum CodingKeys: String, CodingKey {
             case persistedAtomState = "electron-persisted-atom-state"
+            case threadReadState = "electron-thread-read-state-v1"
         }
     }
 
@@ -62,5 +82,10 @@ actor CodexUnreadStateReader {
         enum CodingKeys: String, CodingKey {
             case unreadThreadIDsByHost = "unread-thread-ids-by-host-v1"
         }
+    }
+
+    private struct ThreadReadState: Decodable {
+        /// identity key → host key → unread thread ids
+        let unreadByIdentity: [String: [String: [String]]]?
     }
 }
