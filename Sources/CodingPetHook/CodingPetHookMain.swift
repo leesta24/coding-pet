@@ -53,11 +53,18 @@ enum CodingPetHookMain {
         environment: [String: String]
     ) {
         guard event.provider == .claudeCode,
-              event.eventName == "Stop" || event.eventName == "SessionStart",
-              let token = environment[ClaudeUsageEndpoint.tokenEnvironmentKey],
-              !token.isEmpty,
-              FileManager.default.fileExists(atPath: HookSocketAddress.defaultPath),
-              ClaudeUsageEndpoint.claimAttempt(),
+              event.eventName == "Stop" || event.eventName == "SessionStart" else {
+            return
+        }
+        let hasToken = !(environment[ClaudeUsageEndpoint.tokenEnvironmentKey] ?? "").isEmpty
+        let hasSocket = FileManager.default.fileExists(atPath: HookSocketAddress.defaultPath)
+        guard hasToken, hasSocket else {
+            ClaudeUsageEndpoint.log(
+                "\(event.eventName): skipped, token \(hasToken ? "present" : "absent"), app socket \(hasSocket ? "present" : "absent")"
+            )
+            return
+        }
+        guard ClaudeUsageEndpoint.claimAttempt(),
               let executableURL = Bundle.main.executableURL else {
             return
         }
