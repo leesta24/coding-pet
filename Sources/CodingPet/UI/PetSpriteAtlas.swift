@@ -5,8 +5,22 @@ struct PetSpriteManifest: Decodable, Equatable {
     let id: String
     let displayName: String
     let description: String
+    /// v1 kits omit this field; v2 kits declare 2.
     let spriteVersionNumber: Int
     let spritesheetPath: String
+
+    private enum CodingKeys: String, CodingKey {
+        case id, displayName, description, spriteVersionNumber, spritesheetPath
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
+        spriteVersionNumber = try container.decodeIfPresent(Int.self, forKey: .spriteVersionNumber) ?? 1
+        spritesheetPath = try container.decode(String.self, forKey: .spritesheetPath)
+    }
 }
 
 struct PetSpriteAnimation: Equatable {
@@ -59,7 +73,12 @@ final class PetSpriteAtlas {
     }
 
     static let columns = 8
+    /// v2 kits have 11 rows; v1 kits have 9. Every row this app animates
+    /// (0 and 5–8) exists in both layouts.
     static let rows = 11
+    static let legacyRows = 9
+    static let supportedRowCounts: Set<Int> = [legacyRows, rows]
+    static let supportedSpriteVersions: Set<Int> = [1, 2]
     static let cellWidth = 192
     static let cellHeight = 208
 
@@ -123,6 +142,7 @@ final class PetSpriteAtlas {
     let manifest: PetSpriteManifest
     let pixelWidth: Int
     let pixelHeight: Int
+    let rowCount: Int
 
     private let sourceImage: CGImage
     private var frames: [Int: NSImage] = [:]
@@ -152,7 +172,8 @@ final class PetSpriteAtlas {
         guard let manifest = try? JSONDecoder().decode(
             PetSpriteManifest.self,
             from: Data(contentsOf: manifestURL)
-        ), manifest.id == expectedID, manifest.spriteVersionNumber == 2 else {
+        ), manifest.id == expectedID,
+        Self.supportedSpriteVersions.contains(manifest.spriteVersionNumber) else {
             throw Error.invalidManifest
         }
         let spritesheetURL = manifestURL.deletingLastPathComponent()
@@ -162,7 +183,8 @@ final class PetSpriteAtlas {
             throw Error.missingSpritesheet
         }
         guard sourceImage.width == Self.columns * Self.cellWidth,
-              sourceImage.height == Self.rows * Self.cellHeight else {
+              sourceImage.height % Self.cellHeight == 0,
+              Self.supportedRowCounts.contains(sourceImage.height / Self.cellHeight) else {
             throw Error.invalidDimensions
         }
 
@@ -170,10 +192,11 @@ final class PetSpriteAtlas {
         self.sourceImage = sourceImage
         pixelWidth = sourceImage.width
         pixelHeight = sourceImage.height
+        rowCount = sourceImage.height / Self.cellHeight
     }
 
     func frame(row: Int, column: Int) -> NSImage? {
-        guard (0..<Self.rows).contains(row),
+        guard (0..<rowCount).contains(row),
               (0..<Self.columns).contains(column) else {
             return nil
         }

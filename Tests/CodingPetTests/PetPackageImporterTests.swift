@@ -31,7 +31,7 @@ struct PetPackageImporterTests {
         let requests = RequestLog()
         let importer = PetPackageImporter(
             petsDirectory: sandbox.pets,
-            loader: { url in
+            loader: { url, _ in
                 await requests.record(url)
                 switch url.path {
                 case "/api/pets/test-pet":
@@ -44,8 +44,13 @@ struct PetPackageImporterTests {
             }
         )
 
-        let installed = try await importer.importPet(reference: "https://codex-pets.net/#/pets/test-pet")
+        var stages: [PetPackageImporter.Progress.Stage] = []
+        let installed = try await importer.importPet(
+            reference: "https://codex-pets.net/#/pets/test-pet",
+            onProgress: { stages.append($0.stage) }
+        )
 
+        #expect(stages == [.lookingUp, .downloading, .installing])
         #expect(installed == sandbox.pets.appending(path: "test-pet", directoryHint: .isDirectory))
         let atlas = try PetSpriteAtlas(packageDirectory: installed)
         #expect(atlas.manifest.displayName == "Test Pet")
@@ -63,7 +68,7 @@ struct PetPackageImporterTests {
         let requests = RequestLog()
         let importer = PetPackageImporter(
             petsDirectory: sandbox.pets,
-            loader: { url in
+            loader: { url, _ in
                 await requests.record(url)
                 return (Data(#"{"downloadUrl":"https://evil.example/pet.zip"}"#.utf8), 200)
             }
@@ -80,7 +85,7 @@ struct PetPackageImporterTests {
     func reportsMissingPets() async throws {
         let sandbox = try makeSandbox()
         defer { try? FileManager.default.removeItem(at: sandbox.root) }
-        let importer = PetPackageImporter(petsDirectory: sandbox.pets, loader: { _ in (Data(), 404) })
+        let importer = PetPackageImporter(petsDirectory: sandbox.pets, loader: { _, _ in (Data(), 404) })
 
         await #expect(throws: PetPackageImporter.Error.petNotFound("nobody")) {
             try await importer.importPet(reference: "nobody")
@@ -91,7 +96,7 @@ struct PetPackageImporterTests {
     func reportsResponsesWithoutADownloadLink() async throws {
         let sandbox = try makeSandbox()
         defer { try? FileManager.default.removeItem(at: sandbox.root) }
-        let importer = PetPackageImporter(petsDirectory: sandbox.pets, loader: { _ in (Data("<html>".utf8), 200) })
+        let importer = PetPackageImporter(petsDirectory: sandbox.pets, loader: { _, _ in (Data("<html>".utf8), 200) })
 
         await #expect(throws: PetPackageImporter.Error.unexpectedResponse) {
             try await importer.importPet(reference: "yuumi")
@@ -108,7 +113,7 @@ struct PetPackageImporterTests {
             .write(to: source.appending(path: "pet.json"))
         let archive = sandbox.root.appending(path: "bad.codex-pet.zip")
         try zip(directory: source, to: archive)
-        let importer = PetPackageImporter(petsDirectory: sandbox.pets, loader: { _ in (Data(), 500) })
+        let importer = PetPackageImporter(petsDirectory: sandbox.pets, loader: { _, _ in (Data(), 500) })
 
         await #expect(throws: PetPackageImporter.Error.self) {
             try await importer.importPackage(at: archive)
@@ -120,7 +125,7 @@ struct PetPackageImporterTests {
     func localArchiveImportReplacesAnExistingPackage() async throws {
         let sandbox = try makeSandbox()
         defer { try? FileManager.default.removeItem(at: sandbox.root) }
-        let importer = PetPackageImporter(petsDirectory: sandbox.pets, loader: { _ in (Data(), 500) })
+        let importer = PetPackageImporter(petsDirectory: sandbox.pets, loader: { _, _ in (Data(), 500) })
 
         let first = try makeArchive(id: "swap", displayName: "First", in: sandbox.root, archiveName: "first.zip")
         let second = try makeArchive(id: "swap", displayName: "Second", in: sandbox.root, archiveName: "second.zip")
@@ -144,7 +149,7 @@ struct PetPackageImporterTests {
             localPetsDirectory: sandbox.pets,
             importer: PetPackageImporter(
                 petsDirectory: sandbox.pets,
-                loader: { url in
+                loader: { url, _ in
                     url.path.hasSuffix("/download")
                         ? (try Data(contentsOf: archive), 200)
                         : (Data(#"{"downloadUrl":"/api/pets/store-pet/download"}"#.utf8), 200)

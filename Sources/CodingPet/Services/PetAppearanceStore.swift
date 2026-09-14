@@ -34,6 +34,7 @@ final class PetAppearanceStore: ObservableObject {
     @Published private(set) var availableAppearances: [PetAppearance]
     @Published private(set) var botSize: Double
     @Published private(set) var isImporting = false
+    @Published private(set) var importProgress: PetPackageImporter.Progress?
     @Published private(set) var importFeedback: ImportFeedback?
 
     private let defaults: UserDefaults
@@ -77,21 +78,32 @@ final class PetAppearanceStore: ObservableObject {
     /// Downloads a pet from codex-pets.net by ID or page link, adds it to the library,
     /// and selects it.
     func importPet(reference: String) async {
-        await runImport { try await importer.importPet(reference: reference) }
+        await runImport { progress in
+            try await importer.importPet(reference: reference, onProgress: progress)
+        }
     }
 
     /// Installs a `.codex-pet.zip` from disk, adds it to the library, and selects it.
     func importPackage(at archiveURL: URL) async {
-        await runImport { try await importer.importPackage(at: archiveURL) }
+        await runImport { progress in
+            try await importer.importPackage(at: archiveURL, onProgress: progress)
+        }
     }
 
-    private func runImport(_ operation: () async throws -> URL) async {
+    private func runImport(
+        _ operation: (@escaping PetPackageImporter.ProgressHandler) async throws -> URL
+    ) async {
         guard !isImporting else { return }
         isImporting = true
         importFeedback = nil
-        defer { isImporting = false }
+        defer {
+            isImporting = false
+            importProgress = nil
+        }
         do {
-            let directory = try await operation()
+            let directory = try await operation { [weak self] progress in
+                self?.importProgress = progress
+            }
             reloadAvailableAppearances()
             let importedID = directory.lastPathComponent
             guard let imported = availableAppearances.first(where: { $0.rawValue == importedID }) else {

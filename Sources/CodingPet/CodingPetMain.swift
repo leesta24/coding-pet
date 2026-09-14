@@ -14,6 +14,7 @@ enum CodingPetMain {
         let delegate = AppDelegate()
 
         application.setActivationPolicy(.accessory)
+        application.mainMenu = AppMainMenu.make()
         application.delegate = delegate
         application.run()
     }

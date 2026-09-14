@@ -49,7 +49,7 @@ remain inside Codex or Claude Code.
 ## Pet library
 
 The official source tree includes the user-owned **胖墩** appearance.
-CodingPet also discovers private Codex-compatible v2 packages from:
+CodingPet also discovers private Codex-compatible packages from:
 
 ```text
 ~/Library/Application Support/CodingPet/Pets/<pet-id>/
@@ -57,9 +57,10 @@ CodingPet also discovers private Codex-compatible v2 packages from:
 └── spritesheet.webp
 ```
 
-A valid package uses a transparent `1536x2288` atlas: 8 columns, 11 rows, and
-`192x208` cells. Private packages stay outside this repository and are never
-copied into application or DMG builds.
+A valid package uses a transparent atlas of 8 columns of `192x208` cells with
+11 rows (`1536x2288`, sprite version 2) or 9 rows (`1536x1872`, sprite
+version 1). Private packages stay outside this repository and are never copied
+into application or DMG builds.
 
 ### Import a pet from codex-pets.net
 

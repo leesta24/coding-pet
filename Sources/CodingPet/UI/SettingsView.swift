@@ -318,7 +318,23 @@ private struct AppearanceSettingsView: View {
                     .foregroundStyle(Theme.accent)
             }
 
-            if let feedback = appearanceStore.importFeedback {
+            if let progress = appearanceStore.importProgress {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(progress.title)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    if let fraction = progress.fraction {
+                        ProgressView(value: fraction)
+                    } else {
+                        ProgressView()
+                    }
+                }
+                .progressViewStyle(.linear)
+                .tint(Theme.accent)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(progress.title)
+            } else if let feedback = appearanceStore.importFeedback {
                 let tint = feedback.kind == .success ? Theme.accent : Theme.danger
                 Label(
                     feedback.message,

@@ -35,8 +35,36 @@ struct PetPackageImporter {
         }
     }
 
+    struct Progress: Equatable, Sendable {
+        enum Stage: Equatable, Sendable {
+            case lookingUp
+            case downloading
+            case installing
+        }
+
+        let stage: Stage
+        /// 0...1 while downloading with a known size; nil when indeterminate.
+        let fraction: Double?
+
+        var title: String {
+            switch stage {
+            case .lookingUp: "Looking up pet…"
+            case .downloading:
+                if let fraction {
+                    "Downloading… \(Int((fraction * 100).rounded()))%"
+                } else {
+                    "Downloading…"
+                }
+            case .installing: "Installing…"
+            }
+        }
+    }
+
+    typealias ProgressHandler = @MainActor @Sendable (Progress) -> Void
+    /// Reports bytes received so far and the expected total when known.
+    typealias ByteProgressHandler = @Sendable (_ received: Int64, _ expected: Int64?) -> Void
     /// Returns the downloaded bytes and the HTTP status (200 for non-HTTP responses).
-    typealias DataLoader = @Sendable (URL) async throws -> (data: Data, statusCode: Int)
+    typealias DataLoader = @Sendable (URL, ByteProgressHandler) async throws -> (data: Data, statusCode: Int)
 
     static let siteBaseURL = URL(string: "https://codex-pets.net")!
 
@@ -89,13 +117,17 @@ struct PetPackageImporter {
 
     /// Downloads the pet named by `reference` from codex-pets.net and installs it.
     /// Returns the installed package directory.
-    func importPet(reference: String) async throws -> URL {
+    func importPet(
+        reference: String,
+        onProgress: @escaping ProgressHandler = { _ in }
+    ) async throws -> URL {
         guard let id = Self.petID(fromReference: reference) else {
             throw Error.invalidReference
         }
 
+        onProgress(Progress(stage: .lookingUp, fraction: nil))
         let metadataURL = baseURL.appending(path: "api/pets/\(id)")
-        let metadata = try await loader(metadataURL)
+        let metadata = try await loader(metadataURL) { _, _ in }
         switch metadata.statusCode {
         case 200..<300: break
         case 404: throw Error.petNotFound(id)
@@ -109,11 +141,19 @@ struct PetPackageImporter {
             throw Error.untrustedDownloadHost
         }
 
-        let archive = try await loader(downloadURL)
+        onProgress(Progress(stage: .downloading, fraction: nil))
+        let archive = try await loader(downloadURL) { received, expected in
+            guard let expected, expected > 0 else { return }
+            let fraction = min(Double(received) / Double(expected), 1)
+            Task { @MainActor in
+                onProgress(Progress(stage: .downloading, fraction: fraction))
+            }
+        }
         guard (200..<300).contains(archive.statusCode) else {
             throw Error.serverError(archive.statusCode)
         }
 
+        onProgress(Progress(stage: .installing, fraction: nil))
         let stage = try Self.makeStageDirectory()
         defer { try? FileManager.default.removeItem(at: stage) }
         let archiveURL = stage.appending(path: "\(id).codex-pet.zip")
@@ -122,7 +162,11 @@ struct PetPackageImporter {
     }
 
     /// Installs a `.codex-pet.zip` already on disk. Returns the installed package directory.
-    func importPackage(at archiveURL: URL) async throws -> URL {
+    func importPackage(
+        at archiveURL: URL,
+        onProgress: ProgressHandler = { _ in }
+    ) async throws -> URL {
+        onProgress(Progress(stage: .installing, fraction: nil))
         let stage = try Self.makeStageDirectory()
         defer { try? FileManager.default.removeItem(at: stage) }
         return try await install(archiveURL: archiveURL, expectedID: nil, stage: stage)
@@ -171,10 +215,10 @@ struct PetPackageImporter {
     private static func reason(for error: PetSpriteAtlas.Error) -> String {
         switch error {
         case .missingManifest: "pet.json was not found."
-        case .invalidManifest: "pet.json must declare spriteVersionNumber 2."
+        case .invalidManifest: "pet.json must declare spriteVersionNumber 1 or 2."
         case .missingSpritesheet: "the spritesheet image could not be loaded."
         case .invalidDimensions:
-            "the spritesheet must be \(PetSpriteAtlas.columns * PetSpriteAtlas.cellWidth)x\(PetSpriteAtlas.rows * PetSpriteAtlas.cellHeight)."
+            "the spritesheet must be \(PetSpriteAtlas.columns) columns of \(PetSpriteAtlas.cellWidth)x\(PetSpriteAtlas.cellHeight) frames with \(PetSpriteAtlas.legacyRows) (v1) or \(PetSpriteAtlas.rows) (v2) rows."
         }
     }
 
@@ -221,8 +265,25 @@ struct PetPackageImporter {
         return folders[0]
     }
 
-    private static let defaultLoader: DataLoader = { url in
-        let (data, response) = try await URLSession.shared.data(from: url)
+    private static let defaultLoader: DataLoader = { url, onBytes in
+        let (bytes, response) = try await URLSession.shared.bytes(from: url)
+        let expected = response.expectedContentLength
+        let expectedLength: Int64? = expected > 0 ? expected : nil
+        var data = Data()
+        if let expectedLength {
+            data.reserveCapacity(Int(expectedLength))
+        }
+        var reportedAt: Int64 = 0
+        let reportStep: Int64 = 64 * 1024
+        for try await byte in bytes {
+            data.append(byte)
+            let received = Int64(data.count)
+            if received - reportedAt >= reportStep {
+                reportedAt = received
+                onBytes(received, expectedLength)
+            }
+        }
+        onBytes(Int64(data.count), expectedLength)
         return (data, (response as? HTTPURLResponse)?.statusCode ?? 200)
     }
 
