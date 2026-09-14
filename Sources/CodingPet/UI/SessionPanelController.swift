@@ -218,7 +218,10 @@ final class SessionPanelController {
 
     private func position(relativeTo botPanel: NSPanel) {
         let screenFrame = botPanel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
-        let preferredX = botPanel.frame.minX - panel.frame.width - 12
+        // The panel view carries 12pt of transparent shadow padding and the bot
+        // window 10pt around the sprite, so overlap most of that instead of
+        // adding another gap.
+        let preferredX = botPanel.frame.minX - panel.frame.width + 8
         let x = max(screenFrame.minX + 12, preferredX)
         let y = min(
             max(screenFrame.minY + 12, botPanel.frame.minY),

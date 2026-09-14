@@ -93,10 +93,10 @@ struct PetAppearanceStoreTests {
         #expect(PetAppearanceStore(defaults: defaults).botSize == 112)
 
         defaults.set(500, forKey: PetAppearanceStore.botSizeStorageKey)
-        #expect(PetAppearanceStore(defaults: defaults).botSize == 160)
+        #expect(PetAppearanceStore(defaults: defaults).botSize == PetAppearanceStore.botSizeRange.upperBound)
 
         defaults.set(12, forKey: PetAppearanceStore.botSizeStorageKey)
-        #expect(PetAppearanceStore(defaults: defaults).botSize == 64)
+        #expect(PetAppearanceStore(defaults: defaults).botSize == PetAppearanceStore.botSizeRange.lowerBound)
     }
 
     private func installLocalPet(

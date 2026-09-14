@@ -470,7 +470,7 @@ struct SessionPanelControllerTests {
             y: controller.botWindowFrame.midY
         )
 
-        for size in [64.0, 160.0, 72.0, 144.0, 84.0] {
+        for size in [96.0, 256.0, 104.0, 240.0, 128.0] {
             appearanceStore.setBotSize(size)
 
             let side = size + 20

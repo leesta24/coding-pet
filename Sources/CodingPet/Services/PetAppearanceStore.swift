@@ -6,8 +6,8 @@ final class PetAppearanceStore: ObservableObject {
     static let storageKey = "codingPet.appearance"
     static let animationStorageKey = "codingPet.animationsEnabled"
     static let botSizeStorageKey = "codingPet.botSize"
-    static let botSizeRange: ClosedRange<Double> = 64...160
-    static let defaultBotSize: Double = 84
+    static let botSizeRange: ClosedRange<Double> = 96...256
+    static let defaultBotSize: Double = 128
 
     @Published var selection: PetAppearance {
         didSet {
