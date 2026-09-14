@@ -82,21 +82,23 @@ enum CodingPetHookMain {
 
         let completion = DispatchSemaphore(value: 0)
         var body: Data?
+        var outcome = "no response"
         let task = URLSession.shared.dataTask(
             with: ClaudeUsageEndpoint.request(token: token)
-        ) { data, response, _ in
-            if let status = (response as? HTTPURLResponse)?.statusCode,
-               (200..<300).contains(status) {
-                body = data
+        ) { data, response, error in
+            if let status = (response as? HTTPURLResponse)?.statusCode {
+                outcome = "HTTP \(status)"
+                if (200..<300).contains(status) { body = data }
+            } else if let error {
+                outcome = "error \((error as NSError).code)"
             }
             completion.signal()
         }
         task.resume()
-        guard completion.wait(timeout: .now() + 9) == .success,
-              let body,
-              let limits = ClaudeUsageEndpoint.rateLimits(from: body) else {
-            return
-        }
+        _ = completion.wait(timeout: .now() + 9)
+        let limits = body.flatMap(ClaudeUsageEndpoint.rateLimits)
+        ClaudeUsageEndpoint.log("\(outcome), \(limits == nil ? "no usage windows" : "usage forwarded")")
+        guard let limits else { return }
 
         HookSocketClient.send(HookEventEnvelope(
             provider: .claudeCode,

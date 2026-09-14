@@ -58,6 +58,15 @@ public enum ClaudeUsageEndpoint {
         return true
     }
 
+    /// Overwrites a single diagnostic line (time and HTTP outcome, never the
+    /// token or the body) so a silent failure can be checked after the fact.
+    public static func log(_ message: String, at url: URL? = nil) {
+        let logURL = url ?? defaultStampURL.deletingLastPathComponent()
+            .appending(path: "claude-usage.log")
+        let line = "\(ISO8601DateFormatter().string(from: .now)) \(message)\n"
+        try? Data(line.utf8).write(to: logURL, options: .atomic)
+    }
+
     private static func window(_ value: Any?) -> HookRateLimitWindow? {
         guard let object = value as? [String: Any],
               let utilization = (object["utilization"] as? NSNumber)?.doubleValue,
