@@ -266,16 +266,7 @@ private struct SessionRow: View {
                     .lineLimit(1)
                     .frame(height: 18)
 
-                HStack(spacing: 5) {
-                    ProviderBadge(provider: session.provider)
-                    Text(session.summary)
-                        .lineLimit(1)
-                    Text("·")
-                    Text(session.elapsedReferenceDate, style: .relative)
-                        .monospacedDigit()
-                }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                SessionDetailLine(session: session)
             }
 
             Spacer(minLength: 8)

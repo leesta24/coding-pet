@@ -272,15 +272,6 @@ private struct SessionConversationBubble: View {
     let animationsEnabled: Bool
     let isHovered: Bool
 
-    private var fallbackSummary: String {
-        switch session.status {
-        case .needsInput: "Waiting for your input"
-        case .ready: "Completed — unread activity"
-        case .running: "Working"
-        case .blocked: "Blocked"
-        }
-    }
-
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             statusIndicator
@@ -293,14 +284,7 @@ private struct SessionConversationBubble: View {
                     .lineLimit(1)
                     .frame(height: 18)
 
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    ProviderBadge(provider: session.provider)
-                    Text(session.summary.isEmpty ? fallbackSummary : session.summary)
-                        .lineLimit(session.status == .running ? 2 : 1)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                SessionDetailLine(session: session)
             }
 
             Spacer(minLength: 8)
@@ -330,7 +314,7 @@ private struct SessionConversationBubble: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(session.displayName), \(session.provider.displayName), " +
-            "\(session.summary.isEmpty ? fallbackSummary : session.summary)"
+            "\(session.status.displayName), \(session.summary)"
         )
     }
 

@@ -92,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ]))
         } else {
             sessionStore = SessionStore()
-            claudeUsageStore = ClaudeUsageStore()
+            claudeUsageStore = ClaudeUsageStore(reader: ClaudeUsageReader())
         }
         super.init()
     }

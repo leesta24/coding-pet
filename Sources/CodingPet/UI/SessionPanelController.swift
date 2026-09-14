@@ -111,6 +111,7 @@ final class SessionPanelController {
 
         anchorPanel = botPanel
         codexUsageStore.refresh()
+        claudeUsageStore.refresh()
         position(relativeTo: botPanel)
         attach(to: botPanel)
         panel.orderFrontRegardless()
